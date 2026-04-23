@@ -265,13 +265,64 @@
 
   function renderForm() {
     const contract = currentContract();
-    const form = document.getElementById("contractForm");
     if (!contract) {
       document.getElementById("contractPreview").innerHTML = "";
       return;
     }
-    document.getElementById("contractPreview").innerHTML = renderEditableContractDocument(contract);
+    document.getElementById("contractPreview").innerHTML = renderEditorWorkspace(contract);
     setupPartyASignatureCanvas();
+  }
+
+  function renderEditorWorkspace(contract) {
+    const locked = !canEditContract(contract);
+    const previewContract = makeLivePreviewContract(contract);
+    const status = STATUS[contract.status] || STATUS.draft;
+    return `
+      <div class="editor-workspace">
+        <section class="quick-editor">
+          <div class="quick-editor-head">
+            <h3>可编辑内容</h3>
+            <span>${escapeHtml(status.label)}</span>
+          </div>
+          ${FIELD_GROUPS.map((group) => `
+            <section class="form-section">
+              <h3>${escapeHtml(group.title)}</h3>
+              <div class="quick-field-grid">
+                ${group.fields.map((field) => renderField(contract, field, locked)).join("")}
+              </div>
+            </section>
+          `).join("")}
+        </section>
+        <section class="editor-preview-pane">
+          <div class="editor-preview-title">合同预览</div>
+          ${renderContractDocument(previewContract)}
+        </section>
+      </div>
+    `;
+  }
+
+  function makeLivePreviewContract(contract) {
+    if (!contract || contract.status === "draft") return contract;
+    return {
+      ...contract,
+      snapshot: {
+        ...(contract.snapshot || {}),
+        fields: clone(contract.fields),
+        clauses: clone(DEFAULT_CLAUSES),
+        clauseVersion: CLAUSE_SEED_LABEL,
+        clauseSeedVersion: CLAUSE_SEED_VERSION,
+        publishedAt: contract.publishedAt || contract.snapshot?.publishedAt || nowIso(),
+      },
+    };
+  }
+
+  function refreshEditorPreview(contract) {
+    const pane = document.querySelector(".editor-preview-pane");
+    if (!pane || !contract) return;
+    pane.innerHTML = `
+      <div class="editor-preview-title">合同预览</div>
+      ${renderContractDocument(makeLivePreviewContract(contract))}
+    `;
   }
 
   function renderField(contract, field, locked) {
@@ -353,9 +404,6 @@
     if (!contract) return;
     const status = STATUS[contract.status] || STATUS.draft;
     document.getElementById("previewMeta").textContent = `${status.label} · ${contract.fields.brand || "未命名合同"}`;
-    if (document.activeElement?.closest("#contractForm")) return;
-    document.getElementById("contractPreview").innerHTML = renderEditableContractDocument(contract);
-    setupPartyASignatureCanvas();
     document.getElementById("publishBtn").disabled = contract.status !== "draft";
     document.getElementById("revokeBtn").disabled = !["published", "confirmed"].includes(contract.status);
     const shareBox = document.getElementById("shareBox");
@@ -663,6 +711,7 @@
     markContractChanged(contract);
     saveStore(true);
     refreshShareLink(contract);
+    refreshEditorPreview(contract);
     renderContractList();
     renderMonthlyStats();
   }
