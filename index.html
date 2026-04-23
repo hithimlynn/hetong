@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>合同生成系统</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <strong>合同生成系统</strong>
+          <span id="syncState">本地已同步</span>
+        </div>
+        <nav class="tabs" aria-label="功能">
+          <button class="is-active" type="button" data-view="editor">甲方编辑</button>
+          <button type="button" data-view="signer">乙方签署</button>
+          <button type="button" data-view="clauses">条款版本</button>
+        </nav>
+        <div class="top-actions">
+          <button class="ghost-button" id="newBtn" type="button">新建</button>
+          <button class="ghost-button" id="saveBtn" type="button">保存</button>
+          <button class="primary-button" id="publishBtn" type="button">发布</button>
+          <button class="ghost-button" id="printBtn" type="button">导出 PDF</button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <aside class="sidebar">
+          <div class="sidebar-head">
+            <h2>合同库</h2>
+            <span id="contractCount">0</span>
+          </div>
+          <input id="searchInput" class="search-input" type="search" placeholder="搜索品牌、博主、编号" />
+          <div class="month-stats">
+            <strong>本月统计</strong>
+            <div><span>合同数</span><b id="monthCount">0</b></div>
+            <div><span>总金额</span><b id="monthAmount">¥0</b></div>
+            <div><span>已签署</span><b id="signedCount">0</b></div>
+          </div>
+          <div id="contractList" class="contract-list"></div>
+        </aside>
+
+        <section class="main-area">
+          <section id="editorView" class="view-panel is-active">
+            <section class="card preview-card editor-contract-card">
+              <div class="card-head">
+                <div>
+                  <h2>合同编辑</h2>
+                  <span id="previewMeta">草稿</span>
+                </div>
+                <button class="ghost-button" id="revokeBtn" type="button">撤回</button>
+              </div>
+              <div id="shareBox" class="share-box" hidden>
+                <label for="shareLink">乙方签署链接</label>
+                <div>
+                  <input id="shareLink" readonly />
+                  <button class="ghost-button" id="copyLinkBtn" type="button">复制</button>
+                </div>
+              </div>
+              <div id="validationBox" class="validation-box" hidden></div>
+              <form id="contractForm" class="doc-scroll contract-edit-scroll" autocomplete="off">
+                <div id="contractPreview"></div>
+              </form>
+            </section>
+          </section>
+
+          <section id="signerView" class="view-panel">
+            <div class="signer-grid">
+              <section class="card signer-card">
+                <div class="signer-card-head">
+                  <h2>乙方签署</h2>
+                  <button class="ghost-button" id="signerPrintBtn" type="button">下载 PDF</button>
+                </div>
+                <div id="signerStatus" class="status-note"></div>
+                <label class="field">
+                  <span>签署人</span>
+                  <input id="signerName" type="text" placeholder="请输入签署人姓名" />
+                </label>
+                <label class="confirm-line">
+                  <input id="confirmCheckbox" type="checkbox" />
+                  <span>已确认合同内容无误</span>
+                </label>
+                <div class="signature-pad">
+                  <canvas id="signatureCanvas" aria-label="电子手写签名"></canvas>
+                </div>
+                <div class="action-row">
+                  <button class="ghost-button" id="clearSignBtn" type="button">清除</button>
+                  <button class="primary-button" id="submitSignBtn" type="button">提交签署</button>
+                </div>
+                <div id="signMessage" class="status-note" hidden></div>
+              </section>
+              <section class="card preview-card">
+                <div class="card-head">
+                  <div>
+                    <h2>签署预览</h2>
+                    <span id="signerMeta">待发布</span>
+                  </div>
+                </div>
+                <div class="doc-scroll">
+                  <div id="signerPreview"></div>
+                </div>
+              </section>
+            </div>
+          </section>
+
+          <section id="clausesView" class="view-panel">
+            <section class="card clause-card">
+              <div class="card-head">
+                <div>
+                  <h2>固定法律条款</h2>
+                  <span id="clauseMeta">V1.0 · 发布合同自动绑定快照</span>
+                </div>
+                <button class="primary-button" id="saveClauseVersionBtn" type="button">保存为新版本</button>
+              </div>
+              <div id="clauseList" class="clause-list"></div>
+            </section>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <div id="printRoot" aria-hidden="true"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>
