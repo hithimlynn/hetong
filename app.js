@@ -4,6 +4,9 @@
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
   const CLAUSE_SEED_VERSION = "wlead-pdf-2026-04-23";
   const CLAUSE_SEED_LABEL = "PDF基准 V2026.04.23";
+  const CONTRACT_TITLE = "达人内容发布合作协议";
+  const DEFAULT_BRAND_OPTIONS = ["Wlead"];
+  const DEFAULT_PLATFORM_OPTIONS = ["小红书", "抖音", "bilibili", "公众号", "视频号", "快手", "微博", "知乎", "B站"];
   const INSTANCE_ID = randomToken(8);
   const channel = createChannel();
 
@@ -19,8 +22,8 @@
     {
       title: "合作内容",
       fields: [
-        { key: "brand", label: "品牌", required: true },
-        { key: "platformAccount", label: "平台账号", required: true },
+        { key: "brand", label: "品牌", type: "combo", optionStoreKey: "brandOptions", options: DEFAULT_BRAND_OPTIONS, required: true },
+        { key: "platformAccount", label: "平台", type: "combo", optionStoreKey: "platformOptions", options: DEFAULT_PLATFORM_OPTIONS, required: true },
         { key: "creatorName", label: "博主名称", required: true },
         { key: "partyBPhone", label: "乙方联系电话", required: true },
         {
@@ -106,7 +109,7 @@
 
   const DEFAULT_FIELDS = {
     brand: "Wlead",
-    platformAccount: "小红书 / @creator",
+    platformAccount: "小红书",
     creatorName: "一只允沫",
     partyBPhone: "13800000000",
     sampleShippingInfo: "未寄样",
@@ -124,6 +127,7 @@
   let store = loadStore();
   let activeView = "editor";
   let signerToken = "";
+  let signerPayloadContract = null;
   let signatureDirty = false;
   let canvasReady = false;
   let resizeSignatureCanvas = () => {};
@@ -204,9 +208,9 @@
 
   function renderTabs() {
     document.body.classList.toggle("signer-portal", Boolean(signerToken));
-    document.querySelector(".brand strong").textContent = signerToken ? "合同" : "合同生成系统";
+    document.querySelector(".brand strong").textContent = signerToken ? CONTRACT_TITLE : "合同生成系统";
     if (!document.body.classList.contains("exporting-pdf")) {
-      document.title = signerToken ? "合同" : "合同生成系统";
+      document.title = signerToken ? CONTRACT_TITLE : "合同生成系统";
     }
     document.querySelectorAll("[data-view]").forEach((button) => {
       button.classList.toggle("is-active", button.dataset.view === activeView);
@@ -297,6 +301,15 @@
         </div>
       `;
     }
+    if (field.type === "combo") {
+      const listId = `options-${field.key}`;
+      return `
+        <input data-field-key="${field.key}" type="text" list="${listId}" value="${escapeAttr(value)}" placeholder="选择或输入自定义${escapeAttr(field.label)}" ${disabled} />
+        <datalist id="${listId}">
+          ${comboOptions(field).map((option) => `<option value="${escapeAttr(option)}"></option>`).join("")}
+        </datalist>
+      `;
+    }
     if (field.type === "textarea") {
       return `
         <textarea data-field-key="${field.key}" ${disabled}>${escapeHtml(value)}</textarea>
@@ -352,14 +365,16 @@
     const meta = document.getElementById("signerMeta");
     const canSign = contract && ["published", "confirmed"].includes(contract.status);
     if (!contract) {
-      status.textContent = "暂无可签署合同。请先由甲方发布合同，或打开乙方签署链接。";
+      status.textContent = signerToken
+        ? "签署链接缺少合同数据，请让甲方重新复制最新签署链接。"
+        : "暂无可签署达人内容发布合作协议。请先由甲方发布，或打开乙方签署链接。";
       preview.innerHTML = "";
       meta.textContent = "待发布";
     } else {
       const statusInfo = STATUS[contract.status] || STATUS.draft;
-      status.textContent = `当前状态：${statusInfo.label}`;
+      status.textContent = `当前状态：${CONTRACT_TITLE} · ${statusInfo.label}`;
       preview.innerHTML = renderContractDocument(contract);
-      meta.textContent = `${statusInfo.label} · ${contract.fields.brand || "未命名合同"}`;
+      meta.textContent = `${CONTRACT_TITLE} · ${statusInfo.label}`;
     }
     document.getElementById("signerName").disabled = !canSign;
     document.getElementById("confirmCheckbox").disabled = !canSign;
@@ -413,6 +428,12 @@
   }
 
   function renderTopState() {
+    if (signerToken) {
+      const contract = signerContract();
+      const status = contract ? STATUS[contract.status]?.label || "待发布" : "待发布";
+      document.getElementById("syncState").textContent = `${CONTRACT_TITLE} · ${status}`;
+      return;
+    }
     const contract = currentContract();
     const status = contract ? STATUS[contract.status]?.label || "草稿" : "无合同";
     document.getElementById("syncState").textContent = `本地已同步 · ${status}`;
@@ -421,12 +442,12 @@
   function renderEditableContractDocument(contract) {
     if (contract.status !== "draft") return renderContractDocument(contract);
     const fields = contract.fields;
-    const clauses = activeClauseVersion().sections;
+    const clauses = DEFAULT_CLAUSES;
     const editable = (key) => renderInlineField(contract, fieldConfig(key), false);
     return `
       <article class="contract-document editable-contract">
         <section class="contract-page">
-          <h1 class="doc-title">达人内容发布合作协议</h1>
+          <h1 class="doc-title">${CONTRACT_TITLE}</h1>
           <section class="editable-block">
             <h3>一、合作内容</h3>
             <div class="embedded-grid two-col">
@@ -472,6 +493,20 @@
     return FIELD_GROUPS.flatMap((group) => group.fields).find((field) => field.key === key) || { key, label: key };
   }
 
+  function comboOptions(field) {
+    return normalizeOptions(store[field.optionStoreKey], field.options || []);
+  }
+
+  function rememberComboOption(key, value) {
+    const field = fieldConfig(key);
+    if (field.type !== "combo" || !field.optionStoreKey) return false;
+    const next = normalizeOptions(store[field.optionStoreKey], field.options || [], [value]);
+    const previous = store[field.optionStoreKey] || [];
+    const changed = next.length !== previous.length || next.some((option, index) => option !== previous[index]);
+    if (changed) store[field.optionStoreKey] = next;
+    return changed;
+  }
+
   function renderInlineField(contract, field, locked) {
     return `<div class="embedded-field${field.wide || field.type === "textarea" || field.type === "signature" ? " is-wide" : ""}">
       <span class="embedded-label">${field.label}${field.required ? '<i class="required">*</i>' : ""}</span>
@@ -485,12 +520,12 @@
     return `
       <article class="contract-document">
         <section class="contract-page">
-          <h1 class="doc-title">达人内容发布合作协议</h1>
+          <h1 class="doc-title">${CONTRACT_TITLE}</h1>
           <section class="doc-section">
             <h3>一、合作内容</h3>
             <table class="info-table">
               <tr><th>品牌</th><td>${escapeHtml(fields.brand || "-")}</td><th>博主名称</th><td>${escapeHtml(fields.creatorName || "-")}</td></tr>
-              <tr><th>平台账号</th><td colspan="3">${escapeHtml(fields.platformAccount || "-")}</td></tr>
+              <tr><th>平台</th><td colspan="3">${escapeHtml(fields.platformAccount || "-")}</td></tr>
               <tr><th>联系电话</th><td>${escapeHtml(fields.partyBPhone || "-")}</td><th>寄样信息</th><td>${escapeHtml(fields.sampleShippingInfo || "-")}</td></tr>
               <tr><th>初稿时间</th><td>${escapeHtml(formatDateCn(fields.firstReviewDate || fields.reviewDate) || "-")}</td><th>终稿时间</th><td>${escapeHtml(formatDateCn(fields.finalReviewDate || fields.reviewDate) || "-")}</td></tr>
               <tr><th>发布时间</th><td>${escapeHtml(formatDateCn(fields.publishDate) || "-")}</td><th>保留时间</th><td>${escapeHtml(formatRetentionDate(fields.retentionDate || fields.retentionPeriod) || "-")}</td></tr>
@@ -574,6 +609,10 @@
     if (!key) return;
     if (event.target.type !== "file") {
       handleFieldInput(event);
+      if (rememberComboOption(key, event.target.value)) {
+        saveStore(true);
+        renderForm();
+      }
       return;
     }
     const contract = currentContract();
@@ -959,6 +998,8 @@
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed.contracts) && parsed.contracts.length) {
           parsed.contracts = parsed.contracts.map(normalizeContract);
+          parsed.brandOptions = normalizeOptions(parsed.brandOptions, DEFAULT_BRAND_OPTIONS, parsed.contracts.map((contract) => contract.fields.brand));
+          parsed.platformOptions = normalizeOptions(parsed.platformOptions, DEFAULT_PLATFORM_OPTIONS, parsed.contracts.map((contract) => contract.fields.platformAccount));
           parsed.clauseVersions = normalizeClauseVersions(parsed.clauseVersions);
           const seededVersion = parsed.clauseVersions.find((version) => version.seedVersion === CLAUSE_SEED_VERSION);
           if (seededVersion && parsed.lastAppliedClauseSeed !== CLAUSE_SEED_VERSION) {
@@ -984,6 +1025,8 @@
     return {
       selectedId: contract.id,
       contracts: [contract],
+      brandOptions: normalizeOptions([], DEFAULT_BRAND_OPTIONS, [contract.fields.brand]),
+      platformOptions: normalizeOptions([], DEFAULT_PLATFORM_OPTIONS, [contract.fields.platformAccount]),
       clauseVersions,
       activeClauseVersionId: clauseVersions[0].id,
       lastAppliedClauseSeed: CLAUSE_SEED_VERSION,
@@ -1031,6 +1074,18 @@
     return normalized;
   }
 
+  function normalizeOptions(values, defaults = [], extras = []) {
+    const seen = new Set();
+    return [...defaults, ...(Array.isArray(values) ? values : []), ...extras]
+      .map((value) => String(value || "").trim())
+      .filter((value) => {
+        const key = value.toLowerCase();
+        if (!value || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }
+
   function saveStore(announce) {
     localStorage.setItem(STORE_KEY, JSON.stringify(store));
     if (announce && channel) channel.postMessage({ from: INSTANCE_ID, at: nowIso() });
@@ -1061,7 +1116,7 @@
 
   function signerContract() {
     if (signerToken) {
-      return store.contracts.find((contract) => contract.token === signerToken) || null;
+      return store.contracts.find((contract) => contract.token === signerToken) || signerPayloadContract || null;
     }
     return currentContract();
   }
@@ -1115,8 +1170,13 @@
   }
 
   function parseHashRoute() {
-    if (location.hash.startsWith("#sign=")) {
-      signerToken = decodeURIComponent(location.hash.slice("#sign=".length));
+    signerPayloadContract = null;
+    const hash = location.hash.slice(1);
+    if (hash.startsWith("sign=")) {
+      const params = new URLSearchParams(hash);
+      signerToken = params.get("sign") || "";
+      signerPayloadContract = decodeSignPayload(params.get("payload"), signerToken);
+      hydrateSignerPayloadContract();
       activeView = "signer";
     } else {
       signerToken = "";
@@ -1146,7 +1206,85 @@
   }
 
   function buildSignLink(contract) {
-    return `${location.href.split("#")[0]}#sign=${encodeURIComponent(contract.token)}`;
+    const payload = encodeSignPayload(contract);
+    return `${location.href.split("#")[0]}#sign=${encodeURIComponent(contract.token)}&payload=${encodeURIComponent(payload)}`;
+  }
+
+  function encodeSignPayload(contract) {
+    const fields = clone(contract.snapshot?.fields || contract.fields);
+    const snapshot = {
+      fields,
+      clauses: clone(DEFAULT_CLAUSES),
+      clauseVersion: CLAUSE_SEED_LABEL,
+      clauseSeedVersion: CLAUSE_SEED_VERSION,
+      publishedAt: contract.publishedAt || contract.snapshot?.publishedAt || nowIso(),
+    };
+    return encodePayload({
+      id: contract.id,
+      token: contract.token,
+      status: contract.status,
+      fields,
+      snapshot,
+      publishedAt: contract.publishedAt || snapshot.publishedAt,
+      createdAt: contract.createdAt,
+      updatedAt: contract.updatedAt,
+    });
+  }
+
+  function decodeSignPayload(payload, token) {
+    if (!payload || !token) return null;
+    try {
+      const decoded = JSON.parse(decodePayload(payload));
+      if (decoded.token !== token) return null;
+      return normalizeContract({
+        id: decoded.id || randomToken(12),
+        status: ["published", "confirmed", "signed"].includes(decoded.status) ? decoded.status : "published",
+        token,
+        fields: decoded.fields || decoded.snapshot?.fields || {},
+        snapshot: decoded.snapshot || null,
+        signature: decoded.signature || null,
+        audit: [],
+        publishedAt: decoded.publishedAt || decoded.snapshot?.publishedAt || nowIso(),
+        createdAt: decoded.createdAt || nowIso().slice(0, 10),
+        updatedAt: decoded.updatedAt || nowIso(),
+      });
+    } catch (error) {
+      console.warn("Failed to decode sign payload", error);
+      return null;
+    }
+  }
+
+  function hydrateSignerPayloadContract() {
+    if (!signerToken || !signerPayloadContract) return;
+    if (store.contracts.some((contract) => contract.token === signerToken)) return;
+    store.contracts.unshift(signerPayloadContract);
+    store.selectedId = signerPayloadContract.id;
+    store.brandOptions = normalizeOptions(store.brandOptions, DEFAULT_BRAND_OPTIONS, [signerPayloadContract.fields.brand]);
+    store.platformOptions = normalizeOptions(store.platformOptions, DEFAULT_PLATFORM_OPTIONS, [signerPayloadContract.fields.platformAccount]);
+    saveStore(false);
+  }
+
+  function encodePayload(value) {
+    const json = JSON.stringify(value);
+    if (window.TextEncoder) {
+      const bytes = new TextEncoder().encode(json);
+      let binary = "";
+      bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+      });
+      return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    }
+    return btoa(unescape(encodeURIComponent(json))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  }
+
+  function decodePayload(value) {
+    const base64 = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+    const binary = atob(base64);
+    if (window.TextDecoder) {
+      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+      return new TextDecoder().decode(bytes);
+    }
+    return decodeURIComponent(escape(binary));
   }
 
   function createChannel() {

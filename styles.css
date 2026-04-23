@@ -544,7 +544,8 @@ textarea:disabled {
 }
 
 .party-a-sign-pad {
-  width: min(100%, 320px);
+  width: min(100%, 640px);
+  min-height: 150px;
   aspect-ratio: 4 / 1;
   border: 1px dashed var(--line-strong);
   border-radius: 6px;
