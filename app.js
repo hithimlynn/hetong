@@ -617,7 +617,7 @@
   }
 
   function renderSignatureBlock(contract, fields) {
-    const signature = contract.signature || {};
+    const signature = contract.signature || contract.snapshot?.signature || {};
     const partyASignature = fields.partyASignature ? `<img src="${escapeAttr(fields.partyASignature)}" alt="甲方签名" />` : "";
     const partyADate = fields.partyASignDate ? formatDateCn(fields.partyASignDate) : "";
     const signImage = signature.imageData ? `<img src="${escapeAttr(signature.imageData)}" alt="乙方签名" />` : "";
@@ -794,10 +794,11 @@
     contract.status = "signed";
     contract.signedAt = signature.signedAt;
     contract.signature = signature;
+    syncSignedSignature(contract);
     contract.audit.push(makeAudit("乙方签署", `${signerName} 完成电子手写签名`));
     saveStore(true);
     renderAll();
-    showSignMessage("签署已完成。请复制签署回传链接发送给甲方，甲方打开后会同步签名。", "ok", buildSignedReturnLink(contract));
+    showSignMessage("签署已完成，甲方端合同签名区会显示乙方签名。", "ok");
   }
 
   function selectContractFromList(event) {
@@ -913,25 +914,14 @@
     box.innerHTML = errors.map((error) => `<div>${escapeHtml(error)}</div>`).join("");
   }
 
-  function showSignMessage(message, tone = "warn", actionLink = "") {
+  function showSignMessage(message, tone = "warn") {
     const box = document.getElementById("signMessage");
     box.hidden = false;
     box.innerHTML = `
       <div>${escapeHtml(message)}</div>
-      ${actionLink ? `
-        <div class="sign-return-box">
-          <input id="signReturnLink" type="text" value="${escapeAttr(actionLink)}" readonly />
-          <button class="ghost-button" id="copySignReturnBtn" type="button">复制回传链接</button>
-        </div>
-      ` : ""}
     `;
     box.style.background = tone === "ok" ? "#eaf7ef" : "#fff7e7";
     box.style.color = tone === "ok" ? "#237044" : "#83540f";
-    document.getElementById("copySignReturnBtn")?.addEventListener("click", async () => {
-      const input = document.getElementById("signReturnLink");
-      const copied = await copyTextToClipboard(input.value, input);
-      document.getElementById("copySignReturnBtn").textContent = copied ? "已复制" : "长按链接复制";
-    });
   }
 
   function validateContract(contract) {
@@ -1177,13 +1167,19 @@
     if (fields.sampleShippingInfo === "寄样") fields.sampleShippingInfo = "已寄样";
     if (fields.sampleShippingInfo === "不寄样" || fields.sampleShippingInfo === "待确认") fields.sampleShippingInfo = "未寄样";
     const snapshot = normalizeSnapshot(contract.snapshot, fields);
-    return {
+    const signature = contract.signature || snapshot?.signature || null;
+    const normalized = {
       ...contract,
       token: contract.token || randomToken(18),
       audit: Array.isArray(contract.audit) ? contract.audit : [],
       fields,
       snapshot,
+      signature,
     };
+    if (normalized.status === "signed" && normalized.signature?.imageData) {
+      syncSignedSignature(normalized);
+    }
+    return normalized;
   }
 
   function normalizeSnapshot(snapshot, fields) {
@@ -1285,6 +1281,21 @@
       clauseVersion: CLAUSE_SEED_LABEL,
       clauseSeedVersion: CLAUSE_SEED_VERSION,
       publishedAt: contract.publishedAt || contract.snapshot?.publishedAt || nowIso(),
+    };
+    syncSignedSignature(contract);
+  }
+
+  function syncSignedSignature(contract) {
+    if (!contract?.signature?.imageData) return;
+    contract.snapshot = {
+      ...(contract.snapshot || {}),
+      fields: clone(contract.snapshot?.fields || contract.fields),
+      clauses: clone(DEFAULT_CLAUSES),
+      clauseVersion: CLAUSE_SEED_LABEL,
+      clauseSeedVersion: CLAUSE_SEED_VERSION,
+      publishedAt: contract.publishedAt || contract.snapshot?.publishedAt || nowIso(),
+      signature: clone(contract.signature),
+      signedAt: contract.signedAt || contract.signature.signedAt || nowIso(),
     };
   }
 
@@ -1427,11 +1438,6 @@
     return `${location.href.split("#")[0]}#sign=${encodeURIComponent(contract.token)}&payload=${encodeURIComponent(payload)}`;
   }
 
-  function buildSignedReturnLink(contract) {
-    const payload = encodeSignedPayload(contract);
-    return `${location.href.split("#")[0]}#signed=${encodeURIComponent(contract.token)}&payload=${encodeURIComponent(payload)}`;
-  }
-
   function encodeSignPayload(contract) {
     const fields = clone(contract.snapshot?.fields || contract.fields);
     return encodePayload({
@@ -1475,19 +1481,6 @@
     }
   }
 
-  function encodeSignedPayload(contract) {
-    return encodePayload({
-      id: contract.id,
-      token: contract.token,
-      status: "signed",
-      fields: clone(contract.snapshot?.fields || contract.fields),
-      signature: clone(contract.signature),
-      signedAt: contract.signedAt,
-      confirmedAt: contract.confirmedAt,
-      updatedAt: contract.updatedAt,
-    });
-  }
-
   function decodeSignedPayload(payload, token) {
     if (!payload || !token) return null;
     try {
@@ -1523,10 +1516,12 @@
       existing.signedAt = imported.signedAt;
       existing.confirmedAt = imported.confirmedAt;
       existing.updatedAt = nowIso();
+      syncSignedSignature(existing);
       existing.audit = Array.isArray(existing.audit) ? existing.audit : [];
       existing.audit.push(makeAudit("导入乙方签署", `${imported.signature.signerName || "乙方"} 的签名已回传`));
     } else {
       imported.audit = [makeAudit("导入乙方签署", `${imported.signature.signerName || "乙方"} 的签名已回传`)];
+      syncSignedSignature(imported);
       store.contracts.unshift(imported);
     }
     store.selectedId = target.id;
@@ -1537,14 +1532,16 @@
     if (!signerToken || !signerPayloadContract) return;
     const existing = store.contracts.find((contract) => contract.token === signerToken);
     if (existing) {
-      existing.status = signerPayloadContract.status;
+      const existingSignature = existing.signature || existing.snapshot?.signature || null;
+      existing.status = existing.status === "signed" && !signerPayloadContract.signature ? "signed" : signerPayloadContract.status;
       existing.fields = clone(signerPayloadContract.fields);
       existing.snapshot = clone(signerPayloadContract.snapshot);
-      existing.signature = clone(signerPayloadContract.signature || null);
-      existing.signedAt = signerPayloadContract.signedAt || "";
-      existing.confirmedAt = signerPayloadContract.confirmedAt || "";
+      existing.signature = clone(signerPayloadContract.signature || existingSignature || null);
+      existing.signedAt = signerPayloadContract.signedAt || existing.signedAt || "";
+      existing.confirmedAt = signerPayloadContract.confirmedAt || existing.confirmedAt || "";
       existing.publishedAt = signerPayloadContract.publishedAt;
       existing.updatedAt = signerPayloadContract.updatedAt;
+      if (existing.signature?.imageData) syncSignedSignature(existing);
       store.selectedId = existing.id;
     } else {
       store.contracts.unshift(signerPayloadContract);
