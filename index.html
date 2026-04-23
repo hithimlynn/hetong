@@ -6,7 +6,16 @@
     <title>合同生成系统</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
+  <body class="auth-locked">
+    <section class="auth-screen" aria-label="甲方登录">
+      <form id="authForm" class="auth-card">
+        <h1>合同生成系统</h1>
+        <p>请输入甲方访问密码</p>
+        <input id="authPassword" type="password" inputmode="numeric" placeholder="请输入密码" autocomplete="current-password" />
+        <button class="primary-button" type="submit">进入系统</button>
+        <div id="authMessage" class="auth-message" hidden></div>
+      </form>
+    </section>
     <div class="app-shell">
       <header class="topbar">
         <div class="brand">
@@ -68,9 +77,20 @@
 
           <section id="signerView" class="view-panel">
             <div class="signer-grid">
+              <section class="card preview-card signer-contract-card">
+                <div class="card-head">
+                  <div>
+                    <h2>合同</h2>
+                    <span id="signerMeta">待发布</span>
+                  </div>
+                </div>
+                <div class="doc-scroll">
+                  <div id="signerPreview"></div>
+                </div>
+              </section>
               <section class="card signer-card">
                 <div class="signer-card-head">
-                  <h2>乙方签署</h2>
+                  <h2>签署</h2>
                   <button class="ghost-button" id="signerPrintBtn" type="button">下载 PDF</button>
                 </div>
                 <div id="signerStatus" class="status-note"></div>
@@ -90,17 +110,6 @@
                   <button class="primary-button" id="submitSignBtn" type="button">提交签署</button>
                 </div>
                 <div id="signMessage" class="status-note" hidden></div>
-              </section>
-              <section class="card preview-card">
-                <div class="card-head">
-                  <div>
-                    <h2>签署预览</h2>
-                    <span id="signerMeta">待发布</span>
-                  </div>
-                </div>
-                <div class="doc-scroll">
-                  <div id="signerPreview"></div>
-                </div>
               </section>
             </div>
           </section>

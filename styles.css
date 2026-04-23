@@ -24,6 +24,65 @@ body {
   font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", Arial, sans-serif;
 }
 
+.auth-screen {
+  display: none;
+}
+
+body.auth-locked {
+  background: #eef3f8;
+}
+
+body.auth-locked .app-shell {
+  display: none;
+}
+
+body.auth-locked .auth-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.auth-card {
+  width: min(100%, 360px);
+  display: grid;
+  gap: 12px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 18px 45px rgba(30, 45, 64, 0.12);
+}
+
+.auth-card h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.auth-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.auth-card input {
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 10px;
+  outline: none;
+}
+
+.auth-card input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.auth-message {
+  color: var(--danger);
+  font-size: 13px;
+}
+
 button,
 input,
 textarea,
@@ -931,7 +990,7 @@ body.exporting-pdf .contract-page {
   }
 
   .signer-portal .main-area {
-    padding: 10px 10px 96px;
+    padding: 10px 10px 18px;
   }
 
   .signer-portal .signer-grid {
@@ -941,15 +1000,10 @@ body.exporting-pdf .contract-page {
   }
 
   .signer-portal .signer-card {
-    order: 2;
     position: static;
     padding: 14px;
     border-radius: 8px;
     box-shadow: 0 10px 28px rgba(30, 45, 64, 0.12);
-  }
-
-  .signer-portal .preview-card {
-    order: 1;
   }
 
   .signer-card h2 {

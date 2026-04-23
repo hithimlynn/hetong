@@ -1,5 +1,6 @@
 (() => {
   const STORE_KEY = "simple-contract-system-v1";
+  const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
   const INSTANCE_ID = randomToken(8);
   const channel = createChannel();
@@ -118,6 +119,7 @@
   function init() {
     bindEvents();
     parseHashRoute();
+    applyAuthGate();
     renderAll();
     setupSignatureCanvas();
     if (channel) {
@@ -135,6 +137,7 @@
     });
     window.addEventListener("hashchange", () => {
       parseHashRoute();
+      applyAuthGate();
       renderAll();
     });
     window.addEventListener("afterprint", () => {
@@ -171,6 +174,7 @@
     document.getElementById("contractForm").addEventListener("change", handleFieldChange);
     document.getElementById("contractList").addEventListener("click", selectContractFromList);
     document.getElementById("searchInput").addEventListener("input", renderContractList);
+    document.getElementById("authForm").addEventListener("submit", handleAuthSubmit);
   }
 
   function renderAll() {
@@ -186,6 +190,10 @@
 
   function renderTabs() {
     document.body.classList.toggle("signer-portal", Boolean(signerToken));
+    document.querySelector(".brand strong").textContent = signerToken ? "合同" : "合同生成系统";
+    if (!document.body.classList.contains("exporting-pdf")) {
+      document.title = signerToken ? "合同" : "合同生成系统";
+    }
     document.querySelectorAll("[data-view]").forEach((button) => {
       button.classList.toggle("is-active", button.dataset.view === activeView);
     });
@@ -1070,6 +1078,28 @@
     } else {
       signerToken = "";
     }
+  }
+
+  function applyAuthGate() {
+    const authenticated = localStorage.getItem(AUTH_KEY) === "ok";
+    document.body.classList.toggle("auth-locked", !signerToken && !authenticated);
+  }
+
+  function handleAuthSubmit(event) {
+    event.preventDefault();
+    const input = document.getElementById("authPassword");
+    const message = document.getElementById("authMessage");
+    if (input.value === "87654321") {
+      localStorage.setItem(AUTH_KEY, "ok");
+      input.value = "";
+      message.hidden = true;
+      applyAuthGate();
+      renderAll();
+      return;
+    }
+    message.hidden = false;
+    message.textContent = "密码错误，请重新输入。";
+    input.select();
   }
 
   function buildSignLink(contract) {
