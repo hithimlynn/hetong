@@ -7,6 +7,7 @@
   const CONTRACT_TITLE = "达人内容发布合作协议";
   const DEFAULT_BRAND_OPTIONS = ["Wlead"];
   const DEFAULT_PLATFORM_OPTIONS = ["小红书", "抖音", "bilibili", "公众号", "视频号", "快手", "微博", "知乎", "B站"];
+  const LOCKED_STATUSES = ["signed"];
   const INSTANCE_ID = randomToken(8);
   const channel = createChannel();
 
@@ -440,7 +441,7 @@
   }
 
   function renderEditableContractDocument(contract) {
-    if (contract.status !== "draft") return renderContractDocument(contract);
+    if (!canEditContract(contract)) return renderContractDocument(contract);
     const fields = contract.fields;
     const clauses = DEFAULT_CLAUSES;
     const editable = (key) => renderInlineField(contract, fieldConfig(key), false);
@@ -585,7 +586,7 @@
     if (!key) return;
     if (event.target.type === "file") return;
     const contract = currentContract();
-    if (!contract || contract.status !== "draft") return;
+    if (!canEditContract(contract)) return;
     if (event.target.dataset.retentionLongTerm === "true") {
       contract.fields[key] = event.target.checked ? "长期" : "";
       const dateInput = event.target.closest(".retention-control")?.querySelector('input[type="date"]');
@@ -598,8 +599,9 @@
       const amountUpperInput = document.querySelector('[data-field-key="amountUpper"]');
       if (amountUpperInput) amountUpperInput.value = contract.fields.amountUpper;
     }
-    contract.updatedAt = nowIso();
+    markContractChanged(contract);
     saveStore(true);
+    refreshShareLink(contract);
     renderContractList();
     renderMonthlyStats();
   }
@@ -616,7 +618,7 @@
       return;
     }
     const contract = currentContract();
-    if (!contract || contract.status !== "draft") return;
+    if (!canEditContract(contract)) return;
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
@@ -626,9 +628,10 @@
     const reader = new FileReader();
     reader.onload = () => {
       contract.fields[key] = reader.result;
-      contract.updatedAt = nowIso();
+      markContractChanged(contract);
       saveStore(true);
       showValidation([]);
+      refreshShareLink(contract);
       renderForm();
     };
     reader.readAsDataURL(file);
@@ -646,9 +649,10 @@
   function saveCurrentDraft() {
     const contract = currentContract();
     if (!contract) return;
-    contract.updatedAt = nowIso();
+    markContractChanged(contract);
     saveStore(true);
     showValidation([]);
+    refreshShareLink(contract);
     renderForm();
     renderPreview();
   }
@@ -877,18 +881,11 @@
     });
 
     canvas.addEventListener("pointerup", (event) => {
-      const wasDrawing = drawing;
       drawing = false;
       try {
         canvas.releasePointerCapture(event.pointerId);
       } catch (error) {
         // Pointer capture may already be released.
-      }
-      if (wasDrawing && contract?.status === "draft") {
-        contract.fields.partyASignature = canvas.toDataURL("image/png");
-        contract.updatedAt = nowIso();
-        saveStore(true);
-        renderPreview();
       }
     });
 
@@ -906,7 +903,7 @@
     if (!canvas) return;
     const contract = currentContract();
     const context = canvas.getContext("2d");
-    const canEdit = contract?.status === "draft";
+    const canEdit = canEditContract(contract);
     let drawing = false;
 
     function resize() {
@@ -962,20 +959,22 @@
     });
 
     document.getElementById("clearPartyASignBtn")?.addEventListener("click", () => {
-      if (!contract || contract.status !== "draft") return;
+      if (!canEditContract(contract)) return;
       context.clearRect(0, 0, canvas.width, canvas.height);
       contract.fields.partyASignature = "";
-      contract.updatedAt = nowIso();
+      markContractChanged(contract);
       saveStore(true);
+      refreshShareLink(contract);
       renderForm();
       renderPreview();
     });
 
     document.getElementById("savePartyASignBtn")?.addEventListener("click", () => {
-      if (!contract || contract.status !== "draft") return;
+      if (!canEditContract(contract)) return;
       contract.fields.partyASignature = canvas.toDataURL("image/png");
-      contract.updatedAt = nowIso();
+      markContractChanged(contract);
       saveStore(true);
+      refreshShareLink(contract);
       renderForm();
       renderPreview();
     });
@@ -1084,6 +1083,34 @@
         seen.add(key);
         return true;
       });
+  }
+
+  function canEditContract(contract) {
+    return Boolean(contract) && !LOCKED_STATUSES.includes(contract.status);
+  }
+
+  function markContractChanged(contract) {
+    if (!contract) return;
+    contract.updatedAt = nowIso();
+    syncContractSnapshot(contract);
+  }
+
+  function syncContractSnapshot(contract) {
+    if (!contract || contract.status === "draft") return;
+    contract.snapshot = {
+      ...(contract.snapshot || {}),
+      fields: clone(contract.fields),
+      clauses: clone(DEFAULT_CLAUSES),
+      clauseVersion: CLAUSE_SEED_LABEL,
+      clauseSeedVersion: CLAUSE_SEED_VERSION,
+      publishedAt: contract.publishedAt || contract.snapshot?.publishedAt || nowIso(),
+    };
+  }
+
+  function refreshShareLink(contract) {
+    const shareInput = document.getElementById("shareLink");
+    if (!shareInput || !contract || !["published", "confirmed", "signed"].includes(contract.status)) return;
+    shareInput.value = buildSignLink(contract);
   }
 
   function saveStore(announce) {
