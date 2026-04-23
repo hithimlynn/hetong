@@ -7,7 +7,7 @@
   const CONTRACT_TITLE = "达人内容发布合作协议";
   const DEFAULT_BRAND_OPTIONS = ["Wlead"];
   const DEFAULT_PLATFORM_OPTIONS = ["小红书", "抖音", "bilibili", "公众号", "视频号", "快手", "微博", "知乎", "B站"];
-  const LOCKED_STATUSES = ["signed"];
+  const LOCKED_STATUSES = [];
   const INSTANCE_ID = randomToken(8);
   const channel = createChannel();
 
@@ -175,6 +175,8 @@
         if (activeView !== "signer" && location.hash.startsWith("#sign=")) {
           history.replaceState(null, "", location.pathname + location.search);
           signerToken = "";
+          signerPayloadContract = null;
+          applyAuthGate();
         }
         renderAll();
       });
@@ -1134,6 +1136,14 @@
 
   function markContractChanged(contract) {
     if (!contract) return;
+    if (contract.status === "signed") {
+      contract.status = "published";
+      contract.signature = null;
+      contract.signedAt = "";
+      contract.confirmedAt = "";
+      contract.audit = Array.isArray(contract.audit) ? contract.audit : [];
+      contract.audit.push(makeAudit("甲方修改合同", "已签署合同被甲方修改，原乙方签名失效，需重新签署"));
+    }
     contract.updatedAt = nowIso();
     syncContractSnapshot(contract);
   }
