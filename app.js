@@ -131,6 +131,7 @@
   let activeView = "editor";
   let signerToken = "";
   let signerPayloadContract = null;
+  let openOptionFieldKey = "";
   let signatureDirty = false;
   let canvasReady = false;
   let resizeSignatureCanvas = () => {};
@@ -195,6 +196,7 @@
     document.getElementById("confirmCheckbox").addEventListener("change", confirmSigner);
     document.getElementById("contractForm").addEventListener("input", handleFieldInput);
     document.getElementById("contractForm").addEventListener("change", handleFieldChange);
+    document.getElementById("contractForm").addEventListener("click", handleComboAction);
     document.getElementById("contractList").addEventListener("click", selectContractFromList);
     document.getElementById("searchInput").addEventListener("input", renderContractList);
     document.getElementById("authForm").addEventListener("submit", handleAuthSubmit);
@@ -307,12 +309,29 @@
       `;
     }
     if (field.type === "combo") {
-      const listId = `options-${field.key}`;
+      const isOpen = openOptionFieldKey === field.key;
+      const options = comboOptions(field);
       return `
-        <input data-field-key="${field.key}" type="text" list="${listId}" value="${escapeAttr(value)}" placeholder="${escapeAttr(field.placeholder || `选择或输入自定义${field.label}`)}" ${disabled} />
-        <datalist id="${listId}">
-          ${comboOptions(field).map((option) => `<option value="${escapeAttr(option)}"></option>`).join("")}
-        </datalist>
+        <div class="managed-combo${isOpen ? " is-open" : ""}">
+          <div class="combo-input-row">
+            <input data-field-key="${field.key}" type="text" value="${escapeAttr(value)}" placeholder="${escapeAttr(field.placeholder || `选择或输入自定义${field.label}`)}" ${disabled} />
+            <button class="combo-toggle" type="button" data-combo-toggle="${escapeAttr(field.key)}" aria-expanded="${isOpen ? "true" : "false"}" ${disabled}>${isOpen ? "收起" : "展开"}</button>
+          </div>
+          <div class="combo-panel" ${isOpen ? "" : "hidden"}>
+            <div class="combo-options">
+              ${options.length ? options.map((option) => `
+                <span class="combo-option">
+                  <button type="button" data-combo-select="${escapeAttr(field.key)}" data-combo-value="${escapeAttr(option)}">${escapeHtml(option)}</button>
+                  <button class="combo-delete" type="button" data-combo-delete="${escapeAttr(field.key)}" data-combo-value="${escapeAttr(option)}" title="删除">×</button>
+                </span>
+              `).join("") : '<em class="combo-empty">暂无记录</em>'}
+            </div>
+            <div class="combo-add-row">
+              <input type="text" data-combo-add-input="${escapeAttr(field.key)}" placeholder="新增${escapeAttr(field.label)}" />
+              <button type="button" data-combo-add="${escapeAttr(field.key)}">新增</button>
+            </div>
+          </div>
+        </div>
       `;
     }
     if (field.type === "textarea") {
@@ -500,17 +519,74 @@
   }
 
   function comboOptions(field) {
-    return normalizeOptions(store[field.optionStoreKey], field.options || []);
+    const stored = store[field.optionStoreKey];
+    return normalizeOptions(Array.isArray(stored) ? stored : [], Array.isArray(stored) ? [] : field.options || []);
   }
 
   function rememberComboOption(key, value) {
     const field = fieldConfig(key);
     if (field.type !== "combo" || !field.optionStoreKey) return false;
-    const next = normalizeOptions(store[field.optionStoreKey], field.options || [], [value]);
-    const previous = store[field.optionStoreKey] || [];
+    const previous = Array.isArray(store[field.optionStoreKey]) ? store[field.optionStoreKey] : normalizeOptions([], field.options || []);
+    const next = normalizeOptions(previous, [], [value]);
     const changed = next.length !== previous.length || next.some((option, index) => option !== previous[index]);
     if (changed) store[field.optionStoreKey] = next;
     return changed;
+  }
+
+  function removeComboOption(key, value) {
+    const field = fieldConfig(key);
+    if (field.type !== "combo" || !field.optionStoreKey) return false;
+    const target = String(value || "").trim().toLowerCase();
+    const previous = comboOptions(field);
+    const next = previous.filter((option) => option.toLowerCase() !== target);
+    store[field.optionStoreKey] = next;
+    return next.length !== previous.length;
+  }
+
+  function handleComboAction(event) {
+    const toggle = event.target.closest("[data-combo-toggle]");
+    const select = event.target.closest("[data-combo-select]");
+    const add = event.target.closest("[data-combo-add]");
+    const remove = event.target.closest("[data-combo-delete]");
+    const action = toggle || select || add || remove;
+    if (!action) return;
+    event.preventDefault();
+    const key = action.dataset.comboToggle || action.dataset.comboSelect || action.dataset.comboAdd || action.dataset.comboDelete;
+    const contract = currentContract();
+    const field = fieldConfig(key);
+    if (field.type !== "combo") return;
+
+    if (toggle) {
+      openOptionFieldKey = openOptionFieldKey === key ? "" : key;
+      renderForm();
+      return;
+    }
+
+    if (remove) {
+      removeComboOption(key, remove.dataset.comboValue);
+      saveStore(true);
+      openOptionFieldKey = key;
+      renderForm();
+      return;
+    }
+
+    if (!canEditContract(contract)) return;
+    let value = select?.dataset.comboValue || "";
+    if (add) {
+      const input = add.closest(".managed-combo")?.querySelector("[data-combo-add-input]");
+      value = input?.value.trim() || "";
+      if (!value) return;
+      rememberComboOption(key, value);
+    }
+    if (!value) return;
+    contract.fields[key] = value;
+    markContractChanged(contract);
+    saveStore(true);
+    refreshShareLink(contract);
+    openOptionFieldKey = key;
+    renderContractList();
+    renderMonthlyStats();
+    renderForm();
   }
 
   function renderInlineField(contract, field, locked) {
@@ -740,8 +816,8 @@
     contract.signature = signature;
     contract.audit.push(makeAudit("乙方签署", `${signerName} 完成电子手写签名`));
     saveStore(true);
-    showSignMessage("签署已提交，甲方页面已同步。", "ok");
     renderAll();
+    showSignMessage("签署已完成。请复制签署回传链接发送给甲方，甲方打开后会同步签名。", "ok", buildSignedReturnLink(contract));
   }
 
   function selectContractFromList(event) {
@@ -814,12 +890,29 @@
     box.innerHTML = errors.map((error) => `<div>${escapeHtml(error)}</div>`).join("");
   }
 
-  function showSignMessage(message, tone = "warn") {
+  function showSignMessage(message, tone = "warn", actionLink = "") {
     const box = document.getElementById("signMessage");
     box.hidden = false;
-    box.textContent = message;
+    box.innerHTML = `
+      <div>${escapeHtml(message)}</div>
+      ${actionLink ? `
+        <div class="sign-return-box">
+          <input id="signReturnLink" type="text" value="${escapeAttr(actionLink)}" readonly />
+          <button class="ghost-button" id="copySignReturnBtn" type="button">复制回传链接</button>
+        </div>
+      ` : ""}
+    `;
     box.style.background = tone === "ok" ? "#eaf7ef" : "#fff7e7";
     box.style.color = tone === "ok" ? "#237044" : "#83540f";
+    document.getElementById("copySignReturnBtn")?.addEventListener("click", async () => {
+      const input = document.getElementById("signReturnLink");
+      try {
+        await navigator.clipboard.writeText(input.value);
+        document.getElementById("copySignReturnBtn").textContent = "已复制";
+      } catch (error) {
+        input.select();
+      }
+    });
   }
 
   function validateContract(contract) {
@@ -1002,8 +1095,12 @@
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed.contracts) && parsed.contracts.length) {
           parsed.contracts = parsed.contracts.map(normalizeContract);
-          parsed.brandOptions = normalizeOptions(parsed.brandOptions, DEFAULT_BRAND_OPTIONS, parsed.contracts.map((contract) => contract.fields.brand));
-          parsed.platformOptions = normalizeOptions(parsed.platformOptions, DEFAULT_PLATFORM_OPTIONS, parsed.contracts.map((contract) => contract.fields.platform));
+          parsed.brandOptions = Array.isArray(parsed.brandOptions)
+            ? normalizeOptions(parsed.brandOptions)
+            : normalizeOptions([], DEFAULT_BRAND_OPTIONS, parsed.contracts.map((contract) => contract.fields.brand));
+          parsed.platformOptions = Array.isArray(parsed.platformOptions)
+            ? normalizeOptions(parsed.platformOptions)
+            : normalizeOptions([], DEFAULT_PLATFORM_OPTIONS, parsed.contracts.map((contract) => contract.fields.platform));
           parsed.clauseVersions = normalizeClauseVersions(parsed.clauseVersions);
           const seededVersion = parsed.clauseVersions.find((version) => version.seedVersion === CLAUSE_SEED_VERSION);
           if (seededVersion && parsed.lastAppliedClauseSeed !== CLAUSE_SEED_VERSION) {
@@ -1258,6 +1355,15 @@
       signerPayloadContract = decodeSignPayload(params.get("payload"), signerToken);
       hydrateSignerPayloadContract();
       activeView = "signer";
+    } else if (hash.startsWith("signed=")) {
+      const params = new URLSearchParams(hash);
+      const imported = decodeSignedPayload(params.get("payload"), params.get("signed") || "");
+      signerToken = "";
+      activeView = "editor";
+      if (imported) {
+        importSignedContract(imported);
+        history.replaceState(null, "", location.pathname + location.search);
+      }
     } else {
       signerToken = "";
     }
@@ -1288,6 +1394,11 @@
   function buildSignLink(contract) {
     const payload = encodeSignPayload(contract);
     return `${location.href.split("#")[0]}#sign=${encodeURIComponent(contract.token)}&payload=${encodeURIComponent(payload)}`;
+  }
+
+  function buildSignedReturnLink(contract) {
+    const payload = encodeSignedPayload(contract);
+    return `${location.href.split("#")[0]}#signed=${encodeURIComponent(contract.token)}&payload=${encodeURIComponent(payload)}`;
   }
 
   function encodeSignPayload(contract) {
@@ -1334,13 +1445,92 @@
     }
   }
 
+  function encodeSignedPayload(contract) {
+    return encodePayload({
+      id: contract.id,
+      token: contract.token,
+      status: "signed",
+      fields: clone(contract.snapshot?.fields || contract.fields),
+      snapshot: clone(contract.snapshot || { fields: contract.fields, clauses: DEFAULT_CLAUSES }),
+      signature: clone(contract.signature),
+      signedAt: contract.signedAt,
+      confirmedAt: contract.confirmedAt,
+      updatedAt: contract.updatedAt,
+    });
+  }
+
+  function decodeSignedPayload(payload, token) {
+    if (!payload || !token) return null;
+    try {
+      const decoded = JSON.parse(decodePayload(payload));
+      if (decoded.token !== token || !decoded.signature?.imageData) return null;
+      return normalizeContract({
+        id: decoded.id || randomToken(12),
+        status: "signed",
+        token,
+        fields: decoded.fields || decoded.snapshot?.fields || {},
+        snapshot: decoded.snapshot || null,
+        signature: decoded.signature,
+        signedAt: decoded.signedAt || decoded.signature.signedAt || nowIso(),
+        confirmedAt: decoded.confirmedAt || decoded.signature.confirmedAt || "",
+        audit: [],
+        createdAt: nowIso().slice(0, 10),
+        updatedAt: decoded.updatedAt || nowIso(),
+      });
+    } catch (error) {
+      console.warn("Failed to decode signed payload", error);
+      return null;
+    }
+  }
+
+  function importSignedContract(imported) {
+    const existing = store.contracts.find((contract) => contract.token === imported.token || contract.id === imported.id);
+    const target = existing || imported;
+    if (existing) {
+      existing.status = "signed";
+      existing.fields = clone(imported.fields);
+      existing.snapshot = clone(imported.snapshot);
+      existing.signature = clone(imported.signature);
+      existing.signedAt = imported.signedAt;
+      existing.confirmedAt = imported.confirmedAt;
+      existing.updatedAt = nowIso();
+      existing.audit = Array.isArray(existing.audit) ? existing.audit : [];
+      existing.audit.push(makeAudit("导入乙方签署", `${imported.signature.signerName || "乙方"} 的签名已回传`));
+    } else {
+      imported.audit = [makeAudit("导入乙方签署", `${imported.signature.signerName || "乙方"} 的签名已回传`)];
+      store.contracts.unshift(imported);
+    }
+    store.selectedId = target.id;
+    saveStore(false);
+  }
+
   function hydrateSignerPayloadContract() {
     if (!signerToken || !signerPayloadContract) return;
-    if (store.contracts.some((contract) => contract.token === signerToken)) return;
-    store.contracts.unshift(signerPayloadContract);
-    store.selectedId = signerPayloadContract.id;
-    store.brandOptions = normalizeOptions(store.brandOptions, DEFAULT_BRAND_OPTIONS, [signerPayloadContract.fields.brand]);
-    store.platformOptions = normalizeOptions(store.platformOptions, DEFAULT_PLATFORM_OPTIONS, [signerPayloadContract.fields.platform]);
+    const existing = store.contracts.find((contract) => contract.token === signerToken);
+    if (existing) {
+      existing.status = signerPayloadContract.status;
+      existing.fields = clone(signerPayloadContract.fields);
+      existing.snapshot = clone(signerPayloadContract.snapshot);
+      existing.signature = clone(signerPayloadContract.signature || null);
+      existing.signedAt = signerPayloadContract.signedAt || "";
+      existing.confirmedAt = signerPayloadContract.confirmedAt || "";
+      existing.publishedAt = signerPayloadContract.publishedAt;
+      existing.updatedAt = signerPayloadContract.updatedAt;
+      store.selectedId = existing.id;
+    } else {
+      store.contracts.unshift(signerPayloadContract);
+      store.selectedId = signerPayloadContract.id;
+    }
+    store.brandOptions = normalizeOptions(
+      Array.isArray(store.brandOptions) ? store.brandOptions : [],
+      Array.isArray(store.brandOptions) ? [] : DEFAULT_BRAND_OPTIONS,
+      [signerPayloadContract.fields.brand],
+    );
+    store.platformOptions = normalizeOptions(
+      Array.isArray(store.platformOptions) ? store.platformOptions : [],
+      Array.isArray(store.platformOptions) ? [] : DEFAULT_PLATFORM_OPTIONS,
+      [signerPayloadContract.fields.platform],
+    );
     saveStore(false);
   }
 

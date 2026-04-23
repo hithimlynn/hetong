@@ -328,6 +328,81 @@ textarea:disabled {
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
+.managed-combo {
+  display: grid;
+  gap: 7px;
+}
+
+.combo-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.combo-toggle,
+.combo-add-row button,
+.combo-option button {
+  min-height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  background: #fff;
+  color: #263241;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.combo-toggle {
+  min-width: 58px;
+}
+
+.combo-panel {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #dbe3ee;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.combo-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.combo-option {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid #dbe3ee;
+  border-radius: 5px;
+  background: #f8fafc;
+}
+
+.combo-option button {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.combo-option .combo-delete {
+  min-width: 28px;
+  padding: 0 8px;
+  border-left: 1px solid #dbe3ee;
+  color: var(--danger);
+}
+
+.combo-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.combo-empty {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
 .retention-control {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -776,6 +851,22 @@ textarea:disabled {
   line-height: 1.45;
 }
 
+.sign-return-box {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.sign-return-box input {
+  min-width: 0;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 0 8px;
+  color: var(--ink);
+}
+
 .clause-list {
   display: grid;
   gap: 12px;
@@ -1080,6 +1171,10 @@ body.exporting-pdf .contract-page {
     min-height: 46px;
     border-radius: 7px;
     font-size: 15px;
+  }
+
+  .sign-return-box {
+    grid-template-columns: 1fr;
   }
 
   .status-note {
