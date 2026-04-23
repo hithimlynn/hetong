@@ -941,7 +941,7 @@ body.exporting-pdf .contract-page {
   }
 
   .signer-portal .signer-card {
-    order: 1;
+    order: 2;
     position: static;
     padding: 14px;
     border-radius: 8px;
@@ -949,7 +949,7 @@ body.exporting-pdf .contract-page {
   }
 
   .signer-portal .preview-card {
-    order: 2;
+    order: 1;
   }
 
   .signer-card h2 {
@@ -1002,18 +1002,14 @@ body.exporting-pdf .contract-page {
   }
 
   .signer-portal .action-row {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 30;
+    position: static;
     display: grid;
     grid-template-columns: 0.9fr 1.1fr;
     gap: 8px;
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--line);
-    background: rgba(255, 255, 255, 0.96);
-    box-shadow: 0 -8px 24px rgba(30, 45, 64, 0.12);
+    padding: 0;
+    border-top: 0;
+    background: transparent;
+    box-shadow: none;
   }
 
   .signer-portal .action-row button {
