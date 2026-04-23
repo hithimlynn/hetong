@@ -942,9 +942,7 @@ body.exporting-pdf .contract-page {
 
   .signer-portal .signer-card {
     order: 1;
-    position: sticky;
-    top: 66px;
-    z-index: 10;
+    position: static;
     padding: 14px;
     border-radius: 8px;
     box-shadow: 0 10px 28px rgba(30, 45, 64, 0.12);
@@ -994,7 +992,7 @@ body.exporting-pdf .contract-page {
 
   .signature-pad {
     aspect-ratio: auto;
-    height: min(42vh, 260px);
+    height: clamp(180px, 34vh, 230px);
     border-width: 2px;
     border-radius: 8px;
     background:
