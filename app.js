@@ -627,9 +627,9 @@
     contract.token = contract.token || randomToken(18);
     contract.snapshot = {
       fields: clone(contract.fields),
-      clauses: clone(activeClauseVersion().sections),
-      clauseVersion: activeClauseVersion().version,
-      clauseSeedVersion: activeClauseVersion().seedVersion || "",
+      clauses: clone(DEFAULT_CLAUSES),
+      clauseVersion: CLAUSE_SEED_LABEL,
+      clauseSeedVersion: CLAUSE_SEED_VERSION,
       publishedAt: contract.publishedAt,
     };
     contract.audit.push(makeAudit("发布合同", "生成乙方签署链接并锁定合同快照"));
@@ -686,7 +686,7 @@
       signedAt: nowIso(),
       userAgent: navigator.userAgent,
     };
-    signature.snapshotHash = await makeSnapshotHash(contract.snapshot || { fields: contract.fields, clauses: activeClauseVersion().sections }, signature);
+    signature.snapshotHash = await makeSnapshotHash(contract.snapshot || { fields: contract.fields, clauses: clone(DEFAULT_CLAUSES) }, signature);
     contract.status = "signed";
     contract.signedAt = signature.signedAt;
     contract.signature = signature;
@@ -1023,19 +1023,12 @@
         sampleShippingInfo: snapshot.fields?.sampleShippingInfo || fields.sampleShippingInfo,
       },
     };
-    if (shouldUpgradeSnapshotClauses(normalized)) {
+    if (normalized.clauseSeedVersion !== CLAUSE_SEED_VERSION) {
       normalized.clauses = clone(DEFAULT_CLAUSES);
       normalized.clauseVersion = CLAUSE_SEED_LABEL;
       normalized.clauseSeedVersion = CLAUSE_SEED_VERSION;
     }
     return normalized;
-  }
-
-  function shouldUpgradeSnapshotClauses(snapshot) {
-    if (snapshot.clauseSeedVersion === CLAUSE_SEED_VERSION) return false;
-    const firstClause = snapshot.clauses?.[0];
-    const firstLine = firstClause?.body?.[0] || "";
-    return firstClause?.title === "三、权利义务" && firstLine.includes("甲方应按约定向乙方提供合作需求");
   }
 
   function saveStore(announce) {
@@ -1079,8 +1072,7 @@
   }
 
   function renderClausesForContract(contract) {
-    if (contract.snapshot && contract.status !== "draft") return contract.snapshot.clauses;
-    return activeClauseVersion().sections;
+    return DEFAULT_CLAUSES;
   }
 
   function activeClauseVersion() {
