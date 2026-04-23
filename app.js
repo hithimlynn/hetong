@@ -269,60 +269,8 @@
       document.getElementById("contractPreview").innerHTML = "";
       return;
     }
-    document.getElementById("contractPreview").innerHTML = renderEditorWorkspace(contract);
+    document.getElementById("contractPreview").innerHTML = renderEditableContractDocument(contract);
     setupPartyASignatureCanvas();
-  }
-
-  function renderEditorWorkspace(contract) {
-    const locked = !canEditContract(contract);
-    const previewContract = makeLivePreviewContract(contract);
-    const status = STATUS[contract.status] || STATUS.draft;
-    return `
-      <div class="editor-workspace">
-        <section class="quick-editor">
-          <div class="quick-editor-head">
-            <h3>可编辑内容</h3>
-            <span>${escapeHtml(status.label)}</span>
-          </div>
-          ${FIELD_GROUPS.map((group) => `
-            <section class="form-section">
-              <h3>${escapeHtml(group.title)}</h3>
-              <div class="quick-field-grid">
-                ${group.fields.map((field) => renderField(contract, field, locked)).join("")}
-              </div>
-            </section>
-          `).join("")}
-        </section>
-        <section class="editor-preview-pane">
-          <div class="editor-preview-title">合同预览</div>
-          ${renderContractDocument(previewContract)}
-        </section>
-      </div>
-    `;
-  }
-
-  function makeLivePreviewContract(contract) {
-    if (!contract || contract.status === "draft") return contract;
-    return {
-      ...contract,
-      snapshot: {
-        ...(contract.snapshot || {}),
-        fields: clone(contract.fields),
-        clauses: clone(DEFAULT_CLAUSES),
-        clauseVersion: CLAUSE_SEED_LABEL,
-        clauseSeedVersion: CLAUSE_SEED_VERSION,
-        publishedAt: contract.publishedAt || contract.snapshot?.publishedAt || nowIso(),
-      },
-    };
-  }
-
-  function refreshEditorPreview(contract) {
-    const pane = document.querySelector(".editor-preview-pane");
-    if (!pane || !contract) return;
-    pane.innerHTML = `
-      <div class="editor-preview-title">合同预览</div>
-      ${renderContractDocument(makeLivePreviewContract(contract))}
-    `;
   }
 
   function renderField(contract, field, locked) {
@@ -406,6 +354,10 @@
     document.getElementById("previewMeta").textContent = `${status.label} · ${contract.fields.brand || "未命名合同"}`;
     document.getElementById("publishBtn").disabled = contract.status !== "draft";
     document.getElementById("revokeBtn").disabled = !["published", "confirmed"].includes(contract.status);
+    if (!document.activeElement?.closest("#contractForm")) {
+      document.getElementById("contractPreview").innerHTML = renderEditableContractDocument(contract);
+      setupPartyASignatureCanvas();
+    }
     const shareBox = document.getElementById("shareBox");
     if (["published", "confirmed", "signed"].includes(contract.status)) {
       shareBox.hidden = false;
@@ -711,7 +663,6 @@
     markContractChanged(contract);
     saveStore(true);
     refreshShareLink(contract);
-    refreshEditorPreview(contract);
     renderContractList();
     renderMonthlyStats();
   }
@@ -898,13 +849,56 @@
   }
 
   async function copyShareLink() {
-    const value = document.getElementById("shareLink").value;
+    const input = document.getElementById("shareLink");
+    const value = input.value;
     if (!value) return;
+    const copied = await copyTextToClipboard(value, input);
+    document.getElementById("syncState").textContent = copied ? "签署链接已复制" : "请长按链接手动复制";
+  }
+
+  async function copyTextToClipboard(text, sourceInput) {
+    if (!text) return false;
     try {
-      await navigator.clipboard.writeText(value);
-      document.getElementById("syncState").textContent = "签署链接已复制";
+      if (navigator.clipboard?.writeText && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
     } catch (error) {
-      document.getElementById("shareLink").select();
+      // Fall through to the textarea copy path for mobile browsers.
+    }
+
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.top = "0";
+    textarea.style.left = "0";
+    textarea.style.width = "1px";
+    textarea.style.height = "1px";
+    textarea.style.opacity = "0";
+    textarea.style.fontSize = "16px";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
+    let copied = false;
+    try {
+      copied = document.execCommand("copy");
+    } catch (error) {
+      copied = false;
+    }
+    document.body.removeChild(textarea);
+    if (!copied && sourceInput) selectInputText(sourceInput);
+    return copied;
+  }
+
+  function selectInputText(input) {
+    try {
+      input.focus();
+      input.select();
+      input.setSelectionRange(0, input.value.length);
+    } catch (error) {
+      // Some embedded mobile webviews do not allow programmatic selection.
     }
   }
 
@@ -935,12 +929,8 @@
     box.style.color = tone === "ok" ? "#237044" : "#83540f";
     document.getElementById("copySignReturnBtn")?.addEventListener("click", async () => {
       const input = document.getElementById("signReturnLink");
-      try {
-        await navigator.clipboard.writeText(input.value);
-        document.getElementById("copySignReturnBtn").textContent = "已复制";
-      } catch (error) {
-        input.select();
-      }
+      const copied = await copyTextToClipboard(input.value, input);
+      document.getElementById("copySignReturnBtn").textContent = copied ? "已复制" : "长按链接复制";
     });
   }
 
