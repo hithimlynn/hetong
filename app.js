@@ -24,7 +24,8 @@
       title: "合作内容",
       fields: [
         { key: "brand", label: "品牌", type: "combo", optionStoreKey: "brandOptions", options: DEFAULT_BRAND_OPTIONS, required: true },
-        { key: "platformAccount", label: "平台", type: "combo", optionStoreKey: "platformOptions", options: DEFAULT_PLATFORM_OPTIONS, required: true },
+        { key: "platform", label: "平台", type: "combo", optionStoreKey: "platformOptions", options: DEFAULT_PLATFORM_OPTIONS, required: true },
+        { key: "platformAccount", label: "账号", placeholder: "请输入账号，不进入候选记录" },
         { key: "creatorName", label: "博主名称", required: true },
         { key: "partyBPhone", label: "乙方联系电话", required: true },
         {
@@ -110,7 +111,8 @@
 
   const DEFAULT_FIELDS = {
     brand: "Wlead",
-    platformAccount: "小红书",
+    platform: "小红书",
+    platformAccount: "",
     creatorName: "一只允沫",
     partyBPhone: "13800000000",
     sampleShippingInfo: "未寄样",
@@ -225,7 +227,7 @@
     const query = document.getElementById("searchInput").value.trim().toLowerCase();
     const list = document.getElementById("contractList");
     const items = store.contracts.filter((contract) => {
-      const text = [contract.fields.brand, contract.fields.creatorName, contract.fields.platformAccount, contract.fields.partyBPhone]
+      const text = [contract.fields.brand, contract.fields.creatorName, contract.fields.platform, contract.fields.platformAccount, contract.fields.partyBPhone]
         .join(" ")
         .toLowerCase();
       return !query || text.includes(query);
@@ -238,7 +240,7 @@
           <button class="contract-item${contract.id === store.selectedId ? " is-active" : ""}" type="button" data-contract-id="${escapeAttr(contract.id)}">
             <span class="contract-item-main">
               <strong>${escapeHtml(contract.fields.brand || "未命名合同")}</strong>
-              <span>${escapeHtml(contract.fields.creatorName || "-")} · ${escapeHtml(contract.fields.platformAccount || "-")}</span>
+              <span>${escapeHtml(contract.fields.creatorName || "-")} · ${escapeHtml(formatPlatformLine(contract.fields))}</span>
               <em class="status-pill ${status.className}">${status.label}</em>
             </span>
             <span class="delete-contract-button" data-delete-contract-id="${escapeAttr(contract.id)}" title="删除合同">删除</span>
@@ -305,7 +307,7 @@
     if (field.type === "combo") {
       const listId = `options-${field.key}`;
       return `
-        <input data-field-key="${field.key}" type="text" list="${listId}" value="${escapeAttr(value)}" placeholder="选择或输入自定义${escapeAttr(field.label)}" ${disabled} />
+        <input data-field-key="${field.key}" type="text" list="${listId}" value="${escapeAttr(value)}" placeholder="${escapeAttr(field.placeholder || `选择或输入自定义${field.label}`)}" ${disabled} />
         <datalist id="${listId}">
           ${comboOptions(field).map((option) => `<option value="${escapeAttr(option)}"></option>`).join("")}
         </datalist>
@@ -336,7 +338,7 @@
       `;
     }
     return `
-      <input data-field-key="${field.key}" type="${field.type || "text"}" value="${escapeAttr(value)}" ${disabled} />
+      <input data-field-key="${field.key}" type="${field.type || "text"}" value="${escapeAttr(value)}" placeholder="${escapeAttr(field.placeholder || "")}" ${disabled} />
     `;
   }
 
@@ -454,6 +456,7 @@
             <div class="embedded-grid two-col">
               ${editable("brand")}
               ${editable("creatorName")}
+              ${editable("platform")}
               ${editable("platformAccount")}
               ${editable("partyBPhone")}
               ${editable("sampleShippingInfo")}
@@ -526,7 +529,7 @@
             <h3>一、合作内容</h3>
             <table class="info-table">
               <tr><th>品牌</th><td>${escapeHtml(fields.brand || "-")}</td><th>博主名称</th><td>${escapeHtml(fields.creatorName || "-")}</td></tr>
-              <tr><th>平台</th><td colspan="3">${escapeHtml(fields.platformAccount || "-")}</td></tr>
+              <tr><th>平台</th><td>${escapeHtml(fields.platform || "-")}</td><th>账号</th><td>${escapeHtml(fields.platformAccount || "-")}</td></tr>
               <tr><th>联系电话</th><td>${escapeHtml(fields.partyBPhone || "-")}</td><th>寄样信息</th><td>${escapeHtml(fields.sampleShippingInfo || "-")}</td></tr>
               <tr><th>初稿时间</th><td>${escapeHtml(formatDateCn(fields.firstReviewDate || fields.reviewDate) || "-")}</td><th>终稿时间</th><td>${escapeHtml(formatDateCn(fields.finalReviewDate || fields.reviewDate) || "-")}</td></tr>
               <tr><th>发布时间</th><td>${escapeHtml(formatDateCn(fields.publishDate) || "-")}</td><th>保留时间</th><td>${escapeHtml(formatRetentionDate(fields.retentionDate || fields.retentionPeriod) || "-")}</td></tr>
@@ -998,7 +1001,7 @@
         if (Array.isArray(parsed.contracts) && parsed.contracts.length) {
           parsed.contracts = parsed.contracts.map(normalizeContract);
           parsed.brandOptions = normalizeOptions(parsed.brandOptions, DEFAULT_BRAND_OPTIONS, parsed.contracts.map((contract) => contract.fields.brand));
-          parsed.platformOptions = normalizeOptions(parsed.platformOptions, DEFAULT_PLATFORM_OPTIONS, parsed.contracts.map((contract) => contract.fields.platformAccount));
+          parsed.platformOptions = normalizeOptions(parsed.platformOptions, DEFAULT_PLATFORM_OPTIONS, parsed.contracts.map((contract) => contract.fields.platform));
           parsed.clauseVersions = normalizeClauseVersions(parsed.clauseVersions);
           const seededVersion = parsed.clauseVersions.find((version) => version.seedVersion === CLAUSE_SEED_VERSION);
           if (seededVersion && parsed.lastAppliedClauseSeed !== CLAUSE_SEED_VERSION) {
@@ -1025,7 +1028,7 @@
       selectedId: contract.id,
       contracts: [contract],
       brandOptions: normalizeOptions([], DEFAULT_BRAND_OPTIONS, [contract.fields.brand]),
-      platformOptions: normalizeOptions([], DEFAULT_PLATFORM_OPTIONS, [contract.fields.platformAccount]),
+      platformOptions: normalizeOptions([], DEFAULT_PLATFORM_OPTIONS, [contract.fields.platform]),
       clauseVersions,
       activeClauseVersionId: clauseVersions[0].id,
       lastAppliedClauseSeed: CLAUSE_SEED_VERSION,
@@ -1033,7 +1036,9 @@
   }
 
   function normalizeContract(contract) {
-    const fields = { ...DEFAULT_FIELDS, ...(contract.fields || {}) };
+    const rawFields = contract.fields || {};
+    const fields = { ...DEFAULT_FIELDS, ...rawFields };
+    normalizePlatformFields(fields, rawFields);
     if (!fields.firstReviewDate && fields.reviewDate) fields.firstReviewDate = fields.reviewDate;
     if (!fields.finalReviewDate && fields.reviewDate) fields.finalReviewDate = fields.reviewDate;
     if (!fields.partyBPhone && fields.phone) fields.partyBPhone = fields.phone;
@@ -1053,18 +1058,20 @@
 
   function normalizeSnapshot(snapshot, fields) {
     if (!snapshot) return null;
+    const rawSnapshotFields = snapshot.fields || fields;
     const normalized = {
       ...snapshot,
       fields: {
         ...DEFAULT_FIELDS,
-        ...(snapshot.fields || fields),
-        firstReviewDate: snapshot.fields?.firstReviewDate || snapshot.fields?.reviewDate || fields.firstReviewDate,
-        finalReviewDate: snapshot.fields?.finalReviewDate || snapshot.fields?.reviewDate || fields.finalReviewDate,
-        partyBPhone: snapshot.fields?.partyBPhone || snapshot.fields?.phone || fields.partyBPhone,
-        retentionDate: snapshot.fields?.retentionDate || normalizeDateLike(snapshot.fields?.retentionPeriod) || fields.retentionDate,
-        sampleShippingInfo: snapshot.fields?.sampleShippingInfo || fields.sampleShippingInfo,
+        ...rawSnapshotFields,
+        firstReviewDate: rawSnapshotFields.firstReviewDate || rawSnapshotFields.reviewDate || fields.firstReviewDate,
+        finalReviewDate: rawSnapshotFields.finalReviewDate || rawSnapshotFields.reviewDate || fields.finalReviewDate,
+        partyBPhone: rawSnapshotFields.partyBPhone || rawSnapshotFields.phone || fields.partyBPhone,
+        retentionDate: rawSnapshotFields.retentionDate || normalizeDateLike(rawSnapshotFields.retentionPeriod) || fields.retentionDate,
+        sampleShippingInfo: rawSnapshotFields.sampleShippingInfo || fields.sampleShippingInfo,
       },
     };
+    normalizePlatformFields(normalized.fields, rawSnapshotFields);
     if (normalized.clauseSeedVersion !== CLAUSE_SEED_VERSION) {
       normalized.clauses = clone(DEFAULT_CLAUSES);
       normalized.clauseVersion = CLAUSE_SEED_LABEL;
@@ -1083,6 +1090,42 @@
         seen.add(key);
         return true;
       });
+  }
+
+  function normalizePlatformFields(fields, rawFields = {}) {
+    if (rawFields.platform) {
+      fields.platform = String(rawFields.platform).trim() || DEFAULT_FIELDS.platform;
+      fields.platformAccount = String(rawFields.platformAccount || "").trim();
+      return;
+    }
+    const split = splitPlatformAccount(rawFields.platformAccount ?? fields.platformAccount);
+    fields.platform = split.platform || fields.platform || DEFAULT_FIELDS.platform;
+    fields.platformAccount = split.account || "";
+  }
+
+  function splitPlatformAccount(value) {
+    const text = String(value || "").trim();
+    if (!text) return { platform: "", account: "" };
+    const parts = text.split(/\s*(?:\/|｜|\||,|，)\s*/).filter(Boolean);
+    if (parts.length > 1) {
+      return { platform: parts[0].trim(), account: parts.slice(1).join(" / ").trim() };
+    }
+    const known = DEFAULT_PLATFORM_OPTIONS.find((option) => option.toLowerCase() === text.toLowerCase());
+    if (known) return { platform: known, account: "" };
+    const prefix = DEFAULT_PLATFORM_OPTIONS.find((option) => text.toLowerCase().startsWith(option.toLowerCase()));
+    if (prefix && text.length > prefix.length) {
+      return {
+        platform: prefix,
+        account: text.slice(prefix.length).replace(/^[\s:：/｜|,，-]+/, "").trim(),
+      };
+    }
+    return { platform: text, account: "" };
+  }
+
+  function formatPlatformLine(fields) {
+    const platform = fields.platform || "-";
+    const account = fields.platformAccount ? ` / ${fields.platformAccount}` : "";
+    return `${platform}${account}`;
   }
 
   function canEditContract(contract) {
@@ -1287,7 +1330,7 @@
     store.contracts.unshift(signerPayloadContract);
     store.selectedId = signerPayloadContract.id;
     store.brandOptions = normalizeOptions(store.brandOptions, DEFAULT_BRAND_OPTIONS, [signerPayloadContract.fields.brand]);
-    store.platformOptions = normalizeOptions(store.platformOptions, DEFAULT_PLATFORM_OPTIONS, [signerPayloadContract.fields.platformAccount]);
+    store.platformOptions = normalizeOptions(store.platformOptions, DEFAULT_PLATFORM_OPTIONS, [signerPayloadContract.fields.platform]);
     saveStore(false);
   }
 
