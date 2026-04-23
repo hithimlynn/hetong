@@ -2,6 +2,8 @@
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
+  const CLAUSE_SEED_VERSION = "wlead-pdf-2026-04-23";
+  const CLAUSE_SEED_LABEL = "PDF基准 V2026.04.23";
   const INSTANCE_ID = randomToken(8);
   const channel = createChannel();
 
@@ -61,31 +63,43 @@
     {
       title: "三、权利义务",
       body: [
-        "甲方应按约定向乙方提供合作需求、审核意见和必要资料，并保证其提供内容合法合规。",
-        "乙方应按约定完成内容制作、审核修改、发布和保留，不得擅自删除、隐藏或设置为私密。",
-        "乙方应保证交付内容不侵犯第三方合法权益，并对合作过程中知悉的未公开信息承担保密义务。",
+        "1、甲方权利义务",
+        "（1）本次合作内容制作具体要求，甲方应按照约定时间及时以书面形式发送给乙方，并保证各项内容要求符合相关法规，内容制作过程中为更高效完成创作，相应修改应及时总结告知乙方，且修改次数为（两次）。",
+        "（2）对本次发布推广的内容，甲方可无偿进行再剪辑，相关内容甲方或甲方关联主体可在抖音、",
+        "（3）甲方对本次合作费用有保密义务，所有达人发布后（14）天结算所有费用。",
+        "2、乙方权利义务",
+        "（1）在内容制作完成后乙方应将相关内容成稿以及原素材发送给甲方。",
+        "（2）若甲方内容制作要求有违反国家政策法规，乙方有权拒绝代理发布。",
+        "（3）乙方在内容制作过程中，所提供的策划、拍摄方案应保证不侵犯任何第三方的知识产权。",
+        "（4）乙方应确保其提供的服务内容符合相关法律法规的规定，否则应赔偿甲方因此所遭受的损失，甲方对乙方服务内容的审核并不免除乙方的上述义务。",
+        "（5）乙方应对本协议及服务过程中知悉的甲方信息予以保密，否则应赔偿甲方因此所遭受的损失，本条款在合同履行完毕、解除终止后继续有效，按照下述第6条约定。",
+        "（6）在本次合作内容发布3个月内，乙方未经甲方同意不得对已发布内容进行删改变更。",
+        "（7）若乙方试用产品后5日内决定终止合作，可书面告知甲方并寄回产品并结束与甲方的合作。",
+        "（8）如乙方超过5日未做书面回复，视为乙方认可甲方产品，乙方须在双方约定时间内完成本次合作。",
       ],
     },
     {
       title: "四、违约责任",
       body: [
-        "任一方违反本协议约定，应赔偿守约方因此遭受的实际损失。",
-        "乙方逾期发布或发布内容不符合确认稿的，甲方有权要求限期改正、补发或按比例退款。",
-        "因任一方原因造成第三方索赔的，由责任方自行承担相关责任。",
+        "1、若乙方因自行策划内容出现知识产权侵权引起第三方追索或要求赔偿，由乙方承担责任。",
+        "2、若甲方因定制内容有知识产权侵权引起第三方追索或要求赔偿，由甲方承担责任。",
+        "3、因任何一方原因违约，需按协议费用金额的10%向对方支付违约金。",
       ],
     },
     {
       title: "五、争议解决",
       body: [
-        "本协议适用中华人民共和国法律。",
-        "因本协议产生的争议，双方应友好协商解决；协商不成的，任一方可向履约方所在地人民法院提起诉讼。",
+        "1、因本协议订立、履行、解释所产生的任何争议适用中华人民共和国法律。",
+        "2、因本协议订立、履行、解释所产生的任何争议首先由双方友好协商解决，协商不能解决的，任何一方均有权向履约方所在地人民法院提起诉讼。",
+        "3、乙方在甲方催告后未按照合同约定提供服务，或提供内容与甲方所提需求不符，由此产生内容发布逾期，每逾期1天乙方应承担金额的10％作为违约金，如超过3天的，甲方有权解除合同并要求乙方按照上述第3点的约定赔偿违约金修改内容除外。",
+        "4、甲方在乙方催告后未按照合同约定进行转账，由此产生支付逾期，每逾期1天甲方应承担金额的10％作为违约金内容未发布除外。",
       ],
     },
     {
-      title: "六、协议生效",
+      title: "六、协议的变更及生效",
       body: [
-        "本协议自双方签字或盖章之日起生效。",
-        "本协议发布后绑定当前字段和条款版本快照，后续模板修改不影响已发布合同。",
+        "1、本协议壹式贰份，甲乙双方各持壹份，自双方签字或盖章之日起发生法律效力。",
+        "2、协议中未尽事宜，经双方协商一致，可以签订书面补充协议，补充协议与本协议不一致的，以补充协议为准。本协议部分条款的无效或效力待定不影响其他条款的执行。",
       ],
     },
   ];
@@ -615,6 +629,7 @@
       fields: clone(contract.fields),
       clauses: clone(activeClauseVersion().sections),
       clauseVersion: activeClauseVersion().version,
+      clauseSeedVersion: activeClauseVersion().seedVersion || "",
       publishedAt: contract.publishedAt,
     };
     contract.audit.push(makeAudit("发布合同", "生成乙方签署链接并锁定合同快照"));
@@ -945,12 +960,19 @@
         if (Array.isArray(parsed.contracts) && parsed.contracts.length) {
           parsed.contracts = parsed.contracts.map(normalizeContract);
           parsed.clauseVersions = normalizeClauseVersions(parsed.clauseVersions);
-          parsed.activeClauseVersionId = parsed.clauseVersions.some((version) => version.id === parsed.activeClauseVersionId)
-            ? parsed.activeClauseVersionId
-            : parsed.clauseVersions[parsed.clauseVersions.length - 1].id;
+          const seededVersion = parsed.clauseVersions.find((version) => version.seedVersion === CLAUSE_SEED_VERSION);
+          if (seededVersion && parsed.lastAppliedClauseSeed !== CLAUSE_SEED_VERSION) {
+            parsed.activeClauseVersionId = seededVersion.id;
+            parsed.lastAppliedClauseSeed = CLAUSE_SEED_VERSION;
+          } else {
+            parsed.activeClauseVersionId = parsed.clauseVersions.some((version) => version.id === parsed.activeClauseVersionId)
+              ? parsed.activeClauseVersionId
+              : parsed.clauseVersions[parsed.clauseVersions.length - 1].id;
+          }
           if (!parsed.contracts.some((contract) => contract.id === parsed.selectedId)) {
             parsed.selectedId = parsed.contracts[0].id;
           }
+          if (seededVersion) localStorage.setItem(STORE_KEY, JSON.stringify(parsed));
           return parsed;
         }
       } catch (error) {
@@ -959,7 +981,13 @@
     }
     const contract = makeContract();
     const clauseVersions = seedClauseVersions();
-    return { selectedId: contract.id, contracts: [contract], clauseVersions, activeClauseVersionId: clauseVersions[0].id };
+    return {
+      selectedId: contract.id,
+      contracts: [contract],
+      clauseVersions,
+      activeClauseVersionId: clauseVersions[0].id,
+      lastAppliedClauseSeed: CLAUSE_SEED_VERSION,
+    };
   }
 
   function normalizeContract(contract) {
@@ -971,26 +999,43 @@
     if (!fields.sampleShippingInfo) fields.sampleShippingInfo = DEFAULT_FIELDS.sampleShippingInfo;
     if (fields.sampleShippingInfo === "寄样") fields.sampleShippingInfo = "已寄样";
     if (fields.sampleShippingInfo === "不寄样" || fields.sampleShippingInfo === "待确认") fields.sampleShippingInfo = "未寄样";
+    const snapshot = normalizeSnapshot(contract.snapshot, fields);
     return {
       ...contract,
       token: contract.token || randomToken(18),
       audit: Array.isArray(contract.audit) ? contract.audit : [],
       fields,
-      snapshot: contract.snapshot
-        ? {
-            ...contract.snapshot,
-            fields: {
-              ...DEFAULT_FIELDS,
-              ...(contract.snapshot.fields || fields),
-              firstReviewDate: contract.snapshot.fields?.firstReviewDate || contract.snapshot.fields?.reviewDate || fields.firstReviewDate,
-              finalReviewDate: contract.snapshot.fields?.finalReviewDate || contract.snapshot.fields?.reviewDate || fields.finalReviewDate,
-              partyBPhone: contract.snapshot.fields?.partyBPhone || contract.snapshot.fields?.phone || fields.partyBPhone,
-              retentionDate: contract.snapshot.fields?.retentionDate || normalizeDateLike(contract.snapshot.fields?.retentionPeriod) || fields.retentionDate,
-              sampleShippingInfo: contract.snapshot.fields?.sampleShippingInfo || fields.sampleShippingInfo,
-            },
-          }
-        : null,
+      snapshot,
     };
+  }
+
+  function normalizeSnapshot(snapshot, fields) {
+    if (!snapshot) return null;
+    const normalized = {
+      ...snapshot,
+      fields: {
+        ...DEFAULT_FIELDS,
+        ...(snapshot.fields || fields),
+        firstReviewDate: snapshot.fields?.firstReviewDate || snapshot.fields?.reviewDate || fields.firstReviewDate,
+        finalReviewDate: snapshot.fields?.finalReviewDate || snapshot.fields?.reviewDate || fields.finalReviewDate,
+        partyBPhone: snapshot.fields?.partyBPhone || snapshot.fields?.phone || fields.partyBPhone,
+        retentionDate: snapshot.fields?.retentionDate || normalizeDateLike(snapshot.fields?.retentionPeriod) || fields.retentionDate,
+        sampleShippingInfo: snapshot.fields?.sampleShippingInfo || fields.sampleShippingInfo,
+      },
+    };
+    if (shouldUpgradeSnapshotClauses(normalized)) {
+      normalized.clauses = clone(DEFAULT_CLAUSES);
+      normalized.clauseVersion = CLAUSE_SEED_LABEL;
+      normalized.clauseSeedVersion = CLAUSE_SEED_VERSION;
+    }
+    return normalized;
+  }
+
+  function shouldUpgradeSnapshotClauses(snapshot) {
+    if (snapshot.clauseSeedVersion === CLAUSE_SEED_VERSION) return false;
+    const firstClause = snapshot.clauses?.[0];
+    const firstLine = firstClause?.body?.[0] || "";
+    return firstClause?.title === "三、权利义务" && firstLine.includes("甲方应按约定向乙方提供合作需求");
   }
 
   function saveStore(announce) {
@@ -1051,10 +1096,11 @@
   function seedClauseVersions() {
     return [
       {
-        id: "clause-v1",
-        version: "V1.0",
+        id: `clause-${CLAUSE_SEED_VERSION}`,
+        version: CLAUSE_SEED_LABEL,
         maintainer: "甲方",
         updatedAt: nowIso(),
+        seedVersion: CLAUSE_SEED_VERSION,
         sections: clone(DEFAULT_CLAUSES),
       },
     ];
@@ -1062,13 +1108,18 @@
 
   function normalizeClauseVersions(versions) {
     if (!Array.isArray(versions) || !versions.length) return seedClauseVersions();
-    return versions.map((version, index) => ({
+    const normalized = versions.map((version, index) => ({
       id: version.id || `clause-v${index + 1}`,
       version: version.version || `V1.${index}`,
       maintainer: version.maintainer || "甲方",
       updatedAt: version.updatedAt || nowIso(),
+      seedVersion: version.seedVersion || "",
       sections: Array.isArray(version.sections) && version.sections.length ? version.sections : clone(DEFAULT_CLAUSES),
     }));
+    if (!normalized.some((version) => version.seedVersion === CLAUSE_SEED_VERSION)) {
+      normalized.push(seedClauseVersions()[0]);
+    }
+    return normalized;
   }
 
   function parseHashRoute() {
