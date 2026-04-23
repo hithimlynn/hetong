@@ -328,6 +328,27 @@ textarea:disabled {
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
+.select-manager {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.select-manager select {
+  min-width: 0;
+}
+
+.select-manager .option-button {
+  min-height: 34px;
+  white-space: nowrap;
+}
+
+.select-manager .danger-option {
+  border-color: #edc5c5;
+  color: var(--danger);
+}
+
 .managed-combo {
   display: grid;
   gap: 7px;
@@ -619,9 +640,9 @@ textarea:disabled {
 }
 
 .party-a-sign-pad {
-  width: min(100%, 640px);
-  min-height: 150px;
-  aspect-ratio: 4 / 1;
+  width: min(100%, 720px);
+  min-height: 300px;
+  aspect-ratio: 2 / 1;
   border: 1px dashed var(--line-strong);
   border-radius: 6px;
   background: #fff;
@@ -1070,6 +1091,26 @@ body.exporting-pdf .contract-page {
   .embedded-field textarea {
     min-height: 90px;
     font-size: 15px;
+  }
+
+  .select-manager {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .select-manager select {
+    grid-column: 1 / -1;
+    height: 42px;
+    font-size: 15px;
+  }
+
+  .select-manager .option-button {
+    width: 100%;
+    min-height: 40px;
+  }
+
+  .party-a-sign-pad {
+    min-height: 220px;
+    aspect-ratio: auto;
   }
 
   .signature-grid {

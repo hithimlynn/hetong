@@ -131,7 +131,6 @@
   let activeView = "editor";
   let signerToken = "";
   let signerPayloadContract = null;
-  let openOptionFieldKey = "";
   let signatureDirty = false;
   let canvasReady = false;
   let resizeSignatureCanvas = () => {};
@@ -309,28 +308,14 @@
       `;
     }
     if (field.type === "combo") {
-      const isOpen = openOptionFieldKey === field.key;
-      const options = comboOptions(field);
+      const options = normalizeOptions(comboOptions(field), [], [value]);
       return `
-        <div class="managed-combo${isOpen ? " is-open" : ""}">
-          <div class="combo-input-row">
-            <input data-field-key="${field.key}" type="text" value="${escapeAttr(value)}" placeholder="${escapeAttr(field.placeholder || `选择或输入自定义${field.label}`)}" ${disabled} />
-            <button class="combo-toggle" type="button" data-combo-toggle="${escapeAttr(field.key)}" aria-expanded="${isOpen ? "true" : "false"}" ${disabled}>${isOpen ? "收起" : "展开"}</button>
-          </div>
-          <div class="combo-panel" ${isOpen ? "" : "hidden"}>
-            <div class="combo-options">
-              ${options.length ? options.map((option) => `
-                <span class="combo-option">
-                  <button type="button" data-combo-select="${escapeAttr(field.key)}" data-combo-value="${escapeAttr(option)}">${escapeHtml(option)}</button>
-                  <button class="combo-delete" type="button" data-combo-delete="${escapeAttr(field.key)}" data-combo-value="${escapeAttr(option)}" title="删除">×</button>
-                </span>
-              `).join("") : '<em class="combo-empty">暂无记录</em>'}
-            </div>
-            <div class="combo-add-row">
-              <input type="text" data-combo-add-input="${escapeAttr(field.key)}" placeholder="新增${escapeAttr(field.label)}" />
-              <button type="button" data-combo-add="${escapeAttr(field.key)}">新增</button>
-            </div>
-          </div>
+        <div class="select-manager">
+          <select data-field-key="${field.key}" ${disabled}>
+            ${options.map((option) => `<option value="${escapeAttr(option)}" ${String(option) === String(value) ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
+          </select>
+          <button class="ghost-button option-button" type="button" data-option-add="${escapeAttr(field.key)}" ${disabled}>新增</button>
+          <button class="ghost-button option-button danger-option" type="button" data-option-delete="${escapeAttr(field.key)}" ${disabled}>删除当前</button>
         </div>
       `;
     }
@@ -402,6 +387,10 @@
     }
     document.getElementById("signerName").disabled = !canSign;
     document.getElementById("confirmCheckbox").disabled = !canSign;
+    document.getElementById("confirmCheckbox").checked = Boolean(contract && ["confirmed", "signed"].includes(contract.status));
+    if (contract?.status === "signed" && contract.signature?.signerName) {
+      document.getElementById("signerName").value = contract.signature.signerName;
+    }
     document.getElementById("submitSignBtn").disabled = !canSign;
     document.getElementById("clearSignBtn").disabled = !canSign;
     document.getElementById("signerPrintBtn").disabled = !contract;
@@ -544,46 +533,37 @@
   }
 
   function handleComboAction(event) {
-    const toggle = event.target.closest("[data-combo-toggle]");
-    const select = event.target.closest("[data-combo-select]");
-    const add = event.target.closest("[data-combo-add]");
-    const remove = event.target.closest("[data-combo-delete]");
-    const action = toggle || select || add || remove;
+    const add = event.target.closest("[data-option-add]");
+    const remove = event.target.closest("[data-option-delete]");
+    const action = add || remove;
     if (!action) return;
     event.preventDefault();
-    const key = action.dataset.comboToggle || action.dataset.comboSelect || action.dataset.comboAdd || action.dataset.comboDelete;
+    const key = action.dataset.optionAdd || action.dataset.optionDelete;
     const contract = currentContract();
     const field = fieldConfig(key);
     if (field.type !== "combo") return;
+    if (!canEditContract(contract)) return;
 
-    if (toggle) {
-      openOptionFieldKey = openOptionFieldKey === key ? "" : key;
-      renderForm();
-      return;
+    if (add) {
+      const value = window.prompt(`请输入新的${field.label}`)?.trim() || "";
+      if (!value) return;
+      rememberComboOption(key, value);
+      contract.fields[key] = value;
     }
 
     if (remove) {
-      removeComboOption(key, remove.dataset.comboValue);
-      saveStore(true);
-      openOptionFieldKey = key;
-      renderForm();
-      return;
+      const value = contract.fields[key] || "";
+      if (!value) return;
+      const ok = window.confirm(`确定从${field.label}列表删除「${value}」？`);
+      if (!ok) return;
+      removeComboOption(key, value);
+      const nextOptions = comboOptions(field);
+      contract.fields[key] = nextOptions[0] || "";
     }
 
-    if (!canEditContract(contract)) return;
-    let value = select?.dataset.comboValue || "";
-    if (add) {
-      const input = add.closest(".managed-combo")?.querySelector("[data-combo-add-input]");
-      value = input?.value.trim() || "";
-      if (!value) return;
-      rememberComboOption(key, value);
-    }
-    if (!value) return;
-    contract.fields[key] = value;
     markContractChanged(contract);
     saveStore(true);
     refreshShareLink(contract);
-    openOptionFieldKey = key;
     renderContractList();
     renderMonthlyStats();
     renderForm();
@@ -805,7 +785,7 @@
     const canvas = document.getElementById("signatureCanvas");
     const signature = {
       signerName,
-      imageData: canvas.toDataURL("image/png"),
+      imageData: compactSignatureDataUrl(canvas),
       confirmedAt: contract.confirmedAt || nowIso(),
       signedAt: nowIso(),
       userAgent: navigator.userAgent,
@@ -1086,6 +1066,18 @@
     context.clearRect(0, 0, canvas.width, canvas.height);
     signatureDirty = false;
     if (showMessage) showSignMessage("签名已清除。");
+  }
+
+  function compactSignatureDataUrl(sourceCanvas) {
+    const target = document.createElement("canvas");
+    const sourceRatio = sourceCanvas.width && sourceCanvas.height ? sourceCanvas.width / sourceCanvas.height : 3;
+    target.width = 720;
+    target.height = Math.max(180, Math.round(target.width / sourceRatio));
+    const context = target.getContext("2d");
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, target.width, target.height);
+    context.drawImage(sourceCanvas, 0, 0, target.width, target.height);
+    return target.toDataURL("image/jpeg", 0.82);
   }
 
   function loadStore() {
@@ -1403,20 +1395,13 @@
 
   function encodeSignPayload(contract) {
     const fields = clone(contract.snapshot?.fields || contract.fields);
-    const snapshot = {
-      fields,
-      clauses: clone(DEFAULT_CLAUSES),
-      clauseVersion: CLAUSE_SEED_LABEL,
-      clauseSeedVersion: CLAUSE_SEED_VERSION,
-      publishedAt: contract.publishedAt || contract.snapshot?.publishedAt || nowIso(),
-    };
     return encodePayload({
       id: contract.id,
       token: contract.token,
       status: contract.status,
       fields,
-      snapshot,
-      publishedAt: contract.publishedAt || snapshot.publishedAt,
+      clauseSeedVersion: CLAUSE_SEED_VERSION,
+      publishedAt: contract.publishedAt || contract.snapshot?.publishedAt || nowIso(),
       createdAt: contract.createdAt,
       updatedAt: contract.updatedAt,
     });
@@ -1432,7 +1417,13 @@
         status: ["published", "confirmed", "signed"].includes(decoded.status) ? decoded.status : "published",
         token,
         fields: decoded.fields || decoded.snapshot?.fields || {},
-        snapshot: decoded.snapshot || null,
+        snapshot: decoded.snapshot || {
+          fields: decoded.fields || {},
+          clauses: clone(DEFAULT_CLAUSES),
+          clauseVersion: CLAUSE_SEED_LABEL,
+          clauseSeedVersion: CLAUSE_SEED_VERSION,
+          publishedAt: decoded.publishedAt || nowIso(),
+        },
         signature: decoded.signature || null,
         audit: [],
         publishedAt: decoded.publishedAt || decoded.snapshot?.publishedAt || nowIso(),
@@ -1451,7 +1442,6 @@
       token: contract.token,
       status: "signed",
       fields: clone(contract.snapshot?.fields || contract.fields),
-      snapshot: clone(contract.snapshot || { fields: contract.fields, clauses: DEFAULT_CLAUSES }),
       signature: clone(contract.signature),
       signedAt: contract.signedAt,
       confirmedAt: contract.confirmedAt,
@@ -1489,7 +1479,7 @@
     if (existing) {
       existing.status = "signed";
       existing.fields = clone(imported.fields);
-      existing.snapshot = clone(imported.snapshot);
+      existing.snapshot = clone(imported.snapshot || existing.snapshot || null);
       existing.signature = clone(imported.signature);
       existing.signedAt = imported.signedAt;
       existing.confirmedAt = imported.confirmedAt;
