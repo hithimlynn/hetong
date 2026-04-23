@@ -848,7 +848,15 @@ body.exporting-pdf .contract-page {
 }
 
 .signer-portal .signer-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
   max-width: 1180px;
+  margin: 0 auto;
+}
+
+.signer-portal .signer-card {
+  width: min(100%, 720px);
   margin: 0 auto;
 }
 
