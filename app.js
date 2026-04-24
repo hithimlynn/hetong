@@ -2,12 +2,6 @@
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
-  const CLAUSE_SEED_VERSION = "wlead-pdf-2026-04-23";
-  const CLAUSE_SEED_LABEL = "PDF基准 V2026.04.23";
-  const CONTRACT_TITLE = "达人内容发布合作协议";
-  const DEFAULT_BRAND_OPTIONS = ["Wlead"];
-  const DEFAULT_PLATFORM_OPTIONS = ["小红书", "抖音", "bilibili", "公众号", "视频号", "快手", "微博", "知乎", "B站"];
-  const LOCKED_STATUSES = [];
   const INSTANCE_ID = randomToken(8);
   const channel = createChannel();
 
@@ -23,9 +17,8 @@
     {
       title: "合作内容",
       fields: [
-        { key: "brand", label: "品牌", type: "combo", optionStoreKey: "brandOptions", options: DEFAULT_BRAND_OPTIONS, required: true },
-        { key: "platform", label: "平台", type: "combo", optionStoreKey: "platformOptions", options: DEFAULT_PLATFORM_OPTIONS, required: true },
-        { key: "platformAccount", label: "账号", placeholder: "请输入账号，不进入候选记录" },
+        { key: "brand", label: "品牌", required: true },
+        { key: "platformAccount", label: "平台账号", required: true },
         { key: "creatorName", label: "博主名称", required: true },
         { key: "partyBPhone", label: "乙方联系电话", required: true },
         {
@@ -68,51 +61,38 @@
     {
       title: "三、权利义务",
       body: [
-        "1、甲方权利义务",
-        "（1）本次合作内容制作具体要求，甲方应按照约定时间及时以书面形式发送给乙方，并保证各项内容要求符合相关法规，内容制作过程中为更高效完成创作，相应修改应及时总结告知乙方，且修改次数为（两次）。",
-        "（2）对本次发布推广的内容，甲方可无偿进行再剪辑，相关内容甲方或甲方关联主体可在抖音、",
-        "（3）甲方对本次合作费用有保密义务，所有达人发布后（14）天结算所有费用。",
-        "2、乙方权利义务",
-        "（1）在内容制作完成后乙方应将相关内容成稿以及原素材发送给甲方。",
-        "（2）若甲方内容制作要求有违反国家政策法规，乙方有权拒绝代理发布。",
-        "（3）乙方在内容制作过程中，所提供的策划、拍摄方案应保证不侵犯任何第三方的知识产权。",
-        "（4）乙方应确保其提供的服务内容符合相关法律法规的规定，否则应赔偿甲方因此所遭受的损失，甲方对乙方服务内容的审核并不免除乙方的上述义务。",
-        "（5）乙方应对本协议及服务过程中知悉的甲方信息予以保密，否则应赔偿甲方因此所遭受的损失，本条款在合同履行完毕、解除终止后继续有效，按照下述第6条约定。",
-        "（6）在本次合作内容发布3个月内，乙方未经甲方同意不得对已发布内容进行删改变更。",
-        "（7）若乙方试用产品后5日内决定终止合作，可书面告知甲方并寄回产品并结束与甲方的合作。",
-        "（8）如乙方超过5日未做书面回复，视为乙方认可甲方产品，乙方须在双方约定时间内完成本次合作。",
+        "甲方应按约定向乙方提供合作需求、审核意见和必要资料，并保证其提供内容合法合规。",
+        "乙方应按约定完成内容制作、审核修改、发布和保留，不得擅自删除、隐藏或设置为私密。",
+        "乙方应保证交付内容不侵犯第三方合法权益，并对合作过程中知悉的未公开信息承担保密义务。",
       ],
     },
     {
       title: "四、违约责任",
       body: [
-        "1、若乙方因自行策划内容出现知识产权侵权引起第三方追索或要求赔偿，由乙方承担责任。",
-        "2、若甲方因定制内容有知识产权侵权引起第三方追索或要求赔偿，由甲方承担责任。",
-        "3、因任何一方原因违约，需按协议费用金额的10%向对方支付违约金。",
+        "任一方违反本协议约定，应赔偿守约方因此遭受的实际损失。",
+        "乙方逾期发布或发布内容不符合确认稿的，甲方有权要求限期改正、补发或按比例退款。",
+        "因任一方原因造成第三方索赔的，由责任方自行承担相关责任。",
       ],
     },
     {
       title: "五、争议解决",
       body: [
-        "1、因本协议订立、履行、解释所产生的任何争议适用中华人民共和国法律。",
-        "2、因本协议订立、履行、解释所产生的任何争议首先由双方友好协商解决，协商不能解决的，任何一方均有权向履约方所在地人民法院提起诉讼。",
-        "3、乙方在甲方催告后未按照合同约定提供服务，或提供内容与甲方所提需求不符，由此产生内容发布逾期，每逾期1天乙方应承担金额的10％作为违约金，如超过3天的，甲方有权解除合同并要求乙方按照上述第3点的约定赔偿违约金修改内容除外。",
-        "4、甲方在乙方催告后未按照合同约定进行转账，由此产生支付逾期，每逾期1天甲方应承担金额的10％作为违约金内容未发布除外。",
+        "本协议适用中华人民共和国法律。",
+        "因本协议产生的争议，双方应友好协商解决；协商不成的，任一方可向履约方所在地人民法院提起诉讼。",
       ],
     },
     {
-      title: "六、协议的变更及生效",
+      title: "六、协议生效",
       body: [
-        "1、本协议壹式贰份，甲乙双方各持壹份，自双方签字或盖章之日起发生法律效力。",
-        "2、协议中未尽事宜，经双方协商一致，可以签订书面补充协议，补充协议与本协议不一致的，以补充协议为准。本协议部分条款的无效或效力待定不影响其他条款的执行。",
+        "本协议自双方签字或盖章之日起生效。",
+        "本协议发布后绑定当前字段和条款版本快照，后续模板修改不影响已发布合同。",
       ],
     },
   ];
 
   const DEFAULT_FIELDS = {
     brand: "Wlead",
-    platform: "小红书",
-    platformAccount: "",
+    platformAccount: "小红书 / @creator",
     creatorName: "一只允沫",
     partyBPhone: "13800000000",
     sampleShippingInfo: "未寄样",
@@ -127,47 +107,10 @@
     partyASignature: "",
   };
 
-  const SIGN_LINK_VERSION = 2;
-  const SIGN_HASH_KEY = "s";
-  const SIGN_PAYLOAD_KEY = "p";
-  const SIGN_STATUS_TO_CODE = {
-    draft: "d",
-    published: "p",
-    confirmed: "c",
-    signed: "s",
-    revoked: "r",
-  };
-  const SIGN_CODE_TO_STATUS = {
-    d: "draft",
-    p: "published",
-    c: "confirmed",
-    s: "signed",
-    r: "revoked",
-  };
-  const SHARE_FIELD_KEY_MAP = {
-    brand: "b",
-    platform: "l",
-    platformAccount: "a",
-    creatorName: "n",
-    partyBPhone: "h",
-    sampleShippingInfo: "i",
-    firstReviewDate: "f",
-    finalReviewDate: "g",
-    publishDate: "d",
-    retentionDate: "r",
-    partyAProvided: "m",
-    price: "y",
-    partyASignDate: "x",
-    partyASignature: "q",
-  };
-  const SHARE_FIELD_KEY_MAP_REVERSE = Object.fromEntries(Object.entries(SHARE_FIELD_KEY_MAP).map(([key, value]) => [value, key]));
-
   let store = loadStore();
   let activeView = "editor";
   let signerToken = "";
-  let signerPayloadContract = null;
   let signatureDirty = false;
-  let signerUploadImageData = "";
   let canvasReady = false;
   let resizeSignatureCanvas = () => {};
 
@@ -208,11 +151,9 @@
     document.querySelectorAll("[data-view]").forEach((button) => {
       button.addEventListener("click", () => {
         activeView = button.dataset.view;
-        if (activeView !== "signer" && (location.hash.startsWith("#sign=") || location.hash.startsWith(`#${SIGN_HASH_KEY}=`))) {
+        if (activeView !== "signer" && location.hash.startsWith("#sign=")) {
           history.replaceState(null, "", location.pathname + location.search);
           signerToken = "";
-          signerPayloadContract = null;
-          applyAuthGate();
         }
         renderAll();
       });
@@ -229,11 +170,8 @@
     document.getElementById("clearSignBtn").addEventListener("click", () => clearSignatureCanvas(true));
     document.getElementById("submitSignBtn").addEventListener("click", submitSignature);
     document.getElementById("confirmCheckbox").addEventListener("change", confirmSigner);
-    document.getElementById("signerUpload").addEventListener("change", handleSignerUploadChange);
-    document.getElementById("contractForm").addEventListener("submit", (event) => event.preventDefault());
     document.getElementById("contractForm").addEventListener("input", handleFieldInput);
     document.getElementById("contractForm").addEventListener("change", handleFieldChange);
-    document.getElementById("contractForm").addEventListener("click", handleComboAction);
     document.getElementById("contractList").addEventListener("click", selectContractFromList);
     document.getElementById("searchInput").addEventListener("input", renderContractList);
     document.getElementById("authForm").addEventListener("submit", handleAuthSubmit);
@@ -252,9 +190,9 @@
 
   function renderTabs() {
     document.body.classList.toggle("signer-portal", Boolean(signerToken));
-    document.querySelector(".brand strong").textContent = signerToken ? CONTRACT_TITLE : "合同生成系统";
+    document.querySelector(".brand strong").textContent = signerToken ? "合同" : "合同生成系统";
     if (!document.body.classList.contains("exporting-pdf")) {
-      document.title = signerToken ? CONTRACT_TITLE : "合同生成系统";
+      document.title = signerToken ? "合同" : "合同生成系统";
     }
     document.querySelectorAll("[data-view]").forEach((button) => {
       button.classList.toggle("is-active", button.dataset.view === activeView);
@@ -268,7 +206,7 @@
     const query = document.getElementById("searchInput").value.trim().toLowerCase();
     const list = document.getElementById("contractList");
     const items = store.contracts.filter((contract) => {
-      const text = [contract.fields.brand, contract.fields.creatorName, contract.fields.platform, contract.fields.platformAccount, contract.fields.partyBPhone]
+      const text = [contract.fields.brand, contract.fields.creatorName, contract.fields.platformAccount, contract.fields.partyBPhone]
         .join(" ")
         .toLowerCase();
       return !query || text.includes(query);
@@ -278,14 +216,14 @@
       .map((contract) => {
         const status = STATUS[contract.status] || STATUS.draft;
         return `
-          <div class="contract-item${contract.id === store.selectedId ? " is-active" : ""}">
-            <button class="contract-item-main" type="button" data-contract-id="${escapeAttr(contract.id)}">
+          <button class="contract-item${contract.id === store.selectedId ? " is-active" : ""}" type="button" data-contract-id="${escapeAttr(contract.id)}">
+            <span class="contract-item-main">
               <strong>${escapeHtml(contract.fields.brand || "未命名合同")}</strong>
-              <span>${escapeHtml(contract.fields.creatorName || "-")} · ${escapeHtml(formatPlatformLine(contract.fields))}</span>
+              <span>${escapeHtml(contract.fields.creatorName || "-")} · ${escapeHtml(contract.fields.platformAccount || "-")}</span>
               <em class="status-pill ${status.className}">${status.label}</em>
-            </button>
-            <button class="delete-contract-button" type="button" data-delete-contract-id="${escapeAttr(contract.id)}" title="删除合同">删除</button>
-          </div>
+            </span>
+            <span class="delete-contract-button" data-delete-contract-id="${escapeAttr(contract.id)}" title="删除合同">删除</span>
+          </button>
         `;
       })
       .join("");
@@ -303,6 +241,7 @@
 
   function renderForm() {
     const contract = currentContract();
+    const form = document.getElementById("contractForm");
     if (!contract) {
       document.getElementById("contractPreview").innerHTML = "";
       return;
@@ -344,18 +283,6 @@
         </div>
       `;
     }
-    if (field.type === "combo") {
-      const options = normalizeOptions(comboOptions(field), [], [value]);
-      return `
-        <div class="select-manager">
-          <select data-field-key="${field.key}" ${disabled}>
-            ${options.map((option) => `<option value="${escapeAttr(option)}" ${String(option) === String(value) ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
-          </select>
-          <button class="ghost-button option-button" type="button" data-option-add="${escapeAttr(field.key)}" ${disabled}>新增</button>
-          <button class="ghost-button option-button danger-option" type="button" data-option-delete="${escapeAttr(field.key)}" ${disabled}>删除当前</button>
-        </div>
-      `;
-    }
     if (field.type === "textarea") {
       return `
         <textarea data-field-key="${field.key}" ${disabled}>${escapeHtml(value)}</textarea>
@@ -381,7 +308,7 @@
       `;
     }
     return `
-      <input data-field-key="${field.key}" type="${field.type || "text"}" value="${escapeAttr(value)}" placeholder="${escapeAttr(field.placeholder || "")}" ${disabled} />
+      <input data-field-key="${field.key}" type="${field.type || "text"}" value="${escapeAttr(value)}" ${disabled} />
     `;
   }
 
@@ -390,6 +317,9 @@
     if (!contract) return;
     const status = STATUS[contract.status] || STATUS.draft;
     document.getElementById("previewMeta").textContent = `${status.label} · ${contract.fields.brand || "未命名合同"}`;
+    if (document.activeElement?.closest("#contractForm")) return;
+    document.getElementById("contractPreview").innerHTML = renderEditableContractDocument(contract);
+    setupPartyASignatureCanvas();
     document.getElementById("publishBtn").disabled = contract.status !== "draft";
     document.getElementById("revokeBtn").disabled = !["published", "confirmed"].includes(contract.status);
     const shareBox = document.getElementById("shareBox");
@@ -406,35 +336,19 @@
     const status = document.getElementById("signerStatus");
     const preview = document.getElementById("signerPreview");
     const meta = document.getElementById("signerMeta");
-    const signerNameInput = document.getElementById("signerName");
-    const uploadInput = document.getElementById("signerUpload");
-    const uploadState = document.getElementById("signerUploadState");
     const canSign = contract && ["published", "confirmed"].includes(contract.status);
     if (!contract) {
-      status.textContent = signerToken
-        ? "签署链接缺少合同数据，请让甲方重新复制最新签署链接。"
-        : "暂无可签署达人内容发布合作协议。请先由甲方发布，或打开乙方签署链接。";
+      status.textContent = "暂无可签署合同。请先由甲方发布合同，或打开乙方签署链接。";
       preview.innerHTML = "";
       meta.textContent = "待发布";
-      signerNameInput.value = "";
-      signerUploadImageData = "";
-      uploadInput.value = "";
     } else {
       const statusInfo = STATUS[contract.status] || STATUS.draft;
-      status.textContent = `当前状态：${CONTRACT_TITLE} · ${statusInfo.label}`;
+      status.textContent = `当前状态：${statusInfo.label}`;
       preview.innerHTML = renderContractDocument(contract);
-      meta.textContent = `${CONTRACT_TITLE} · ${statusInfo.label}`;
-      if (contract.status === "signed" && contract.signature?.signerName) {
-        signerNameInput.value = contract.signature.signerName;
-      }
+      meta.textContent = `${statusInfo.label} · ${contract.fields.brand || "未命名合同"}`;
     }
-    signerNameInput.disabled = !canSign;
+    document.getElementById("signerName").disabled = !canSign;
     document.getElementById("confirmCheckbox").disabled = !canSign;
-    document.getElementById("confirmCheckbox").checked = Boolean(contract && ["confirmed", "signed"].includes(contract.status));
-    uploadInput.disabled = !canSign;
-    uploadState.textContent = signerUploadImageData
-      ? "已选择签名图片，提交时会优先使用上传图片。"
-      : "可上传签名图片，或直接手写签名。";
     document.getElementById("submitSignBtn").disabled = !canSign;
     document.getElementById("clearSignBtn").disabled = !canSign;
     document.getElementById("signerPrintBtn").disabled = !contract;
@@ -485,32 +399,25 @@
   }
 
   function renderTopState() {
-    if (signerToken) {
-      const contract = signerContract();
-      const status = contract ? STATUS[contract.status]?.label || "待发布" : "待发布";
-      document.getElementById("syncState").textContent = `${CONTRACT_TITLE} · ${status}`;
-      return;
-    }
     const contract = currentContract();
     const status = contract ? STATUS[contract.status]?.label || "草稿" : "无合同";
     document.getElementById("syncState").textContent = `本地已同步 · ${status}`;
   }
 
   function renderEditableContractDocument(contract) {
-    if (!canEditContract(contract)) return renderContractDocument(contract);
+    if (contract.status !== "draft") return renderContractDocument(contract);
     const fields = contract.fields;
-    const clauses = DEFAULT_CLAUSES;
+    const clauses = activeClauseVersion().sections;
     const editable = (key) => renderInlineField(contract, fieldConfig(key), false);
     return `
       <article class="contract-document editable-contract">
         <section class="contract-page">
-          <h1 class="doc-title">${CONTRACT_TITLE}</h1>
+          <h1 class="doc-title">达人内容发布合作协议</h1>
           <section class="editable-block">
             <h3>一、合作内容</h3>
             <div class="embedded-grid two-col">
               ${editable("brand")}
               ${editable("creatorName")}
-              ${editable("platform")}
               ${editable("platformAccount")}
               ${editable("partyBPhone")}
               ${editable("sampleShippingInfo")}
@@ -551,68 +458,6 @@
     return FIELD_GROUPS.flatMap((group) => group.fields).find((field) => field.key === key) || { key, label: key };
   }
 
-  function comboOptions(field) {
-    const stored = store[field.optionStoreKey];
-    return normalizeOptions(Array.isArray(stored) ? stored : [], Array.isArray(stored) ? [] : field.options || []);
-  }
-
-  function rememberComboOption(key, value) {
-    const field = fieldConfig(key);
-    if (field.type !== "combo" || !field.optionStoreKey) return false;
-    const previous = Array.isArray(store[field.optionStoreKey]) ? store[field.optionStoreKey] : normalizeOptions([], field.options || []);
-    const next = normalizeOptions(previous, [], [value]);
-    const changed = next.length !== previous.length || next.some((option, index) => option !== previous[index]);
-    if (changed) store[field.optionStoreKey] = next;
-    return changed;
-  }
-
-  function removeComboOption(key, value) {
-    const field = fieldConfig(key);
-    if (field.type !== "combo" || !field.optionStoreKey) return false;
-    const target = String(value || "").trim().toLowerCase();
-    const previous = comboOptions(field);
-    const next = previous.filter((option) => option.toLowerCase() !== target);
-    store[field.optionStoreKey] = next;
-    return next.length !== previous.length;
-  }
-
-  async function handleComboAction(event) {
-    const add = event.target.closest("[data-option-add]");
-    const remove = event.target.closest("[data-option-delete]");
-    const action = add || remove;
-    if (!action) return;
-    event.preventDefault();
-    const key = action.dataset.optionAdd || action.dataset.optionDelete;
-    const contract = currentContract();
-    const field = fieldConfig(key);
-    if (field.type !== "combo") return;
-    if (!canEditContract(contract)) return;
-
-    if (add) {
-      const value = (await promptForText(`新增${field.label}`, `请输入新的${field.label}`))?.trim() || "";
-      if (!value) return;
-      rememberComboOption(key, value);
-      contract.fields[key] = value;
-    }
-
-    if (remove) {
-      const value = contract.fields[key] || "";
-      if (!value) return;
-      const ok = await confirmAction(`确定从${field.label}列表删除「${value}」？`);
-      if (!ok) return;
-      removeComboOption(key, value);
-      const nextOptions = comboOptions(field);
-      contract.fields[key] = nextOptions[0] || "";
-    }
-
-    markContractChanged(contract);
-    saveStore(true);
-    refreshShareLink(contract);
-    renderContractList();
-    renderMonthlyStats();
-    renderForm();
-  }
-
   function renderInlineField(contract, field, locked) {
     return `<div class="embedded-field${field.wide || field.type === "textarea" || field.type === "signature" ? " is-wide" : ""}">
       <span class="embedded-label">${field.label}${field.required ? '<i class="required">*</i>' : ""}</span>
@@ -626,12 +471,12 @@
     return `
       <article class="contract-document">
         <section class="contract-page">
-          <h1 class="doc-title">${CONTRACT_TITLE}</h1>
+          <h1 class="doc-title">达人内容发布合作协议</h1>
           <section class="doc-section">
             <h3>一、合作内容</h3>
             <table class="info-table">
               <tr><th>品牌</th><td>${escapeHtml(fields.brand || "-")}</td><th>博主名称</th><td>${escapeHtml(fields.creatorName || "-")}</td></tr>
-              <tr><th>平台</th><td>${escapeHtml(fields.platform || "-")}</td><th>账号</th><td>${escapeHtml(fields.platformAccount || "-")}</td></tr>
+              <tr><th>平台账号</th><td colspan="3">${escapeHtml(fields.platformAccount || "-")}</td></tr>
               <tr><th>联系电话</th><td>${escapeHtml(fields.partyBPhone || "-")}</td><th>寄样信息</th><td>${escapeHtml(fields.sampleShippingInfo || "-")}</td></tr>
               <tr><th>初稿时间</th><td>${escapeHtml(formatDateCn(fields.firstReviewDate || fields.reviewDate) || "-")}</td><th>终稿时间</th><td>${escapeHtml(formatDateCn(fields.finalReviewDate || fields.reviewDate) || "-")}</td></tr>
               <tr><th>发布时间</th><td>${escapeHtml(formatDateCn(fields.publishDate) || "-")}</td><th>保留时间</th><td>${escapeHtml(formatRetentionDate(fields.retentionDate || fields.retentionPeriod) || "-")}</td></tr>
@@ -661,7 +506,7 @@
   }
 
   function renderSignatureBlock(contract, fields) {
-    const signature = contract.signature || contract.snapshot?.signature || {};
+    const signature = contract.signature || {};
     const partyASignature = fields.partyASignature ? `<img src="${escapeAttr(fields.partyASignature)}" alt="甲方签名" />` : "";
     const partyADate = fields.partyASignDate ? formatDateCn(fields.partyASignDate) : "";
     const signImage = signature.imageData ? `<img src="${escapeAttr(signature.imageData)}" alt="乙方签名" />` : "";
@@ -691,7 +536,7 @@
     if (!key) return;
     if (event.target.type === "file") return;
     const contract = currentContract();
-    if (!canEditContract(contract)) return;
+    if (!contract || contract.status !== "draft") return;
     if (event.target.dataset.retentionLongTerm === "true") {
       contract.fields[key] = event.target.checked ? "长期" : "";
       const dateInput = event.target.closest(".retention-control")?.querySelector('input[type="date"]');
@@ -704,9 +549,8 @@
       const amountUpperInput = document.querySelector('[data-field-key="amountUpper"]');
       if (amountUpperInput) amountUpperInput.value = contract.fields.amountUpper;
     }
-    markContractChanged(contract);
+    contract.updatedAt = nowIso();
     saveStore(true);
-    refreshShareLink(contract);
     renderContractList();
     renderMonthlyStats();
   }
@@ -716,14 +560,10 @@
     if (!key) return;
     if (event.target.type !== "file") {
       handleFieldInput(event);
-      if (rememberComboOption(key, event.target.value)) {
-        saveStore(true);
-        renderForm();
-      }
       return;
     }
     const contract = currentContract();
-    if (!canEditContract(contract)) return;
+    if (!contract || contract.status !== "draft") return;
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
@@ -731,12 +571,11 @@
       return;
     }
     const reader = new FileReader();
-    reader.onload = async () => {
-      contract.fields[key] = await compactImageDataUrl(reader.result, 320, 0.72);
-      markContractChanged(contract);
+    reader.onload = () => {
+      contract.fields[key] = reader.result;
+      contract.updatedAt = nowIso();
       saveStore(true);
       showValidation([]);
-      refreshShareLink(contract);
       renderForm();
     };
     reader.readAsDataURL(file);
@@ -747,7 +586,6 @@
     store.contracts.unshift(contract);
     store.selectedId = contract.id;
     activeView = "editor";
-    document.getElementById("searchInput").value = "";
     saveStore(true);
     renderAll();
   }
@@ -755,10 +593,9 @@
   function saveCurrentDraft() {
     const contract = currentContract();
     if (!contract) return;
-    markContractChanged(contract);
+    contract.updatedAt = nowIso();
     saveStore(true);
     showValidation([]);
-    refreshShareLink(contract);
     renderForm();
     renderPreview();
   }
@@ -776,9 +613,8 @@
     contract.token = contract.token || randomToken(18);
     contract.snapshot = {
       fields: clone(contract.fields),
-      clauses: clone(DEFAULT_CLAUSES),
-      clauseVersion: CLAUSE_SEED_LABEL,
-      clauseSeedVersion: CLAUSE_SEED_VERSION,
+      clauses: clone(activeClauseVersion().sections),
+      clauseVersion: activeClauseVersion().version,
       publishedAt: contract.publishedAt,
     };
     contract.audit.push(makeAudit("发布合同", "生成乙方签署链接并锁定合同快照"));
@@ -811,7 +647,6 @@
     const contract = signerContract();
     const signerName = document.getElementById("signerName").value.trim();
     const confirmed = document.getElementById("confirmCheckbox").checked;
-    const hasUploadedSignature = Boolean(signerUploadImageData);
     if (!contract || !["published", "confirmed"].includes(contract.status)) {
       showSignMessage("当前合同不可签署。");
       return;
@@ -824,63 +659,26 @@
       showSignMessage("请输入签署人姓名。");
       return;
     }
-    if (!signatureDirty && !hasUploadedSignature) {
-      showSignMessage("请先上传签名图片或在签名区域手写签名。");
+    if (!signatureDirty) {
+      showSignMessage("请先在签名区域手写签名。");
       return;
     }
     const canvas = document.getElementById("signatureCanvas");
     const signature = {
       signerName,
-      imageData: hasUploadedSignature ? signerUploadImageData : compactSignatureDataUrl(canvas),
+      imageData: canvas.toDataURL("image/png"),
       confirmedAt: contract.confirmedAt || nowIso(),
       signedAt: nowIso(),
       userAgent: navigator.userAgent,
     };
-    signature.snapshotHash = await makeSnapshotHash(contract.snapshot || { fields: contract.fields, clauses: clone(DEFAULT_CLAUSES) }, signature);
+    signature.snapshotHash = await makeSnapshotHash(contract.snapshot || { fields: contract.fields, clauses: activeClauseVersion().sections }, signature);
     contract.status = "signed";
     contract.signedAt = signature.signedAt;
     contract.signature = signature;
-    syncSignedSignature(contract);
     contract.audit.push(makeAudit("乙方签署", `${signerName} 完成电子手写签名`));
     saveStore(true);
-    signerUploadImageData = "";
-    document.getElementById("signerUpload").value = "";
-    if (localStorage.getItem(AUTH_KEY) === "ok") {
-      signerToken = "";
-      signerPayloadContract = null;
-      activeView = "editor";
-      history.replaceState(null, "", location.pathname + location.search);
-      applyAuthGate();
-      renderAll();
-      document.getElementById("syncState").textContent = "乙方签名已同步到甲方合同";
-      return;
-    }
+    showSignMessage("签署已提交，甲方页面已同步。", "ok");
     renderAll();
-    showSignMessage("签署已完成，甲方端合同签名区会显示乙方签名。", "ok");
-  }
-
-  function handleSignerUploadChange(event) {
-    const contract = signerContract();
-    if (!contract || !canEditSigner(contract)) return;
-    const file = event.target.files?.[0];
-    if (!file) {
-      signerUploadImageData = "";
-      renderSigner();
-      return;
-    }
-    if (!file.type.startsWith("image/")) {
-      signerUploadImageData = "";
-      event.target.value = "";
-      showSignMessage("请上传图片格式的乙方签名。");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = async () => {
-      signerUploadImageData = await compactImageDataUrl(reader.result, 560, 0.8);
-      renderSigner();
-      showSignMessage("签名图片已载入，提交时会同步到甲方端。", "ok");
-    };
-    reader.readAsDataURL(file);
   }
 
   function selectContractFromList(event) {
@@ -894,17 +692,17 @@
     store.selectedId = item.dataset.contractId;
     activeView = "editor";
     signerToken = "";
-    if (location.hash.startsWith("#sign=") || location.hash.startsWith(`#${SIGN_HASH_KEY}=`)) {
+    if (location.hash.startsWith("#sign=")) {
       history.replaceState(null, "", location.pathname + location.search);
     }
     saveStore(false);
     renderAll();
   }
 
-  async function deleteContract(contractId) {
+  function deleteContract(contractId) {
     const contract = store.contracts.find((item) => item.id === contractId);
     if (!contract) return;
-    const ok = await confirmAction(`确定删除合同「${contract.fields.brand || contract.fields.creatorName || "未命名合同"}」？`);
+    const ok = window.confirm(`确定删除合同「${contract.fields.brand || contract.fields.creatorName || "未命名合同"}」？`);
     if (!ok) return;
     store.contracts = store.contracts.filter((item) => item.id !== contractId);
     if (!store.contracts.length) {
@@ -932,148 +730,14 @@
   }
 
   async function copyShareLink() {
-    const input = document.getElementById("shareLink");
-    const value = input.value;
+    const value = document.getElementById("shareLink").value;
     if (!value) return;
-    const copied = await copyTextToClipboard(value, input);
-    document.getElementById("syncState").textContent = copied ? "签署链接已复制" : "请长按链接手动复制";
-  }
-
-  async function copyTextToClipboard(text, sourceInput) {
-    if (!text) return false;
     try {
-      if (navigator.clipboard?.writeText && window.isSecureContext) {
-        await navigator.clipboard.writeText(text);
-        return true;
-      }
+      await navigator.clipboard.writeText(value);
+      document.getElementById("syncState").textContent = "签署链接已复制";
     } catch (error) {
-      // Fall through to the textarea copy path for mobile browsers.
+      document.getElementById("shareLink").select();
     }
-
-    const textarea = document.createElement("textarea");
-    textarea.value = text;
-    textarea.setAttribute("readonly", "");
-    textarea.style.position = "fixed";
-    textarea.style.top = "0";
-    textarea.style.left = "0";
-    textarea.style.width = "1px";
-    textarea.style.height = "1px";
-    textarea.style.opacity = "0";
-    textarea.style.fontSize = "16px";
-    document.body.appendChild(textarea);
-    textarea.focus();
-    textarea.select();
-    textarea.setSelectionRange(0, textarea.value.length);
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch (error) {
-      copied = false;
-    }
-    document.body.removeChild(textarea);
-    if (!copied && sourceInput) selectInputText(sourceInput);
-    return copied;
-  }
-
-  function selectInputText(input) {
-    try {
-      input.focus();
-      input.select();
-      input.setSelectionRange(0, input.value.length);
-    } catch (error) {
-      // Some embedded mobile webviews do not allow programmatic selection.
-    }
-  }
-
-  function confirmAction(message) {
-    return new Promise((resolve) => {
-      const backdrop = renderDialog({
-        title: "请确认",
-        message,
-        actions: [
-          { label: "取消", style: "ghost", onClick: () => resolve(false) },
-          { label: "确定", style: "primary", onClick: () => resolve(true) },
-        ],
-      });
-      attachDialogLifecycle(backdrop);
-    });
-  }
-
-  function promptForText(title, message, initialValue = "") {
-    return new Promise((resolve) => {
-      const inputId = `dialog-input-${randomToken(6)}`;
-      const backdrop = renderDialog({
-        title,
-        message,
-        body: `<input id="${inputId}" type="text" value="${escapeAttr(initialValue)}" />`,
-        actions: [
-          { label: "取消", style: "ghost", onClick: () => resolve(null) },
-          {
-            label: "确定",
-            style: "primary",
-            onClick: (root) => resolve(root.querySelector(`#${inputId}`)?.value.trim() || ""),
-          },
-        ],
-      });
-      const input = backdrop.querySelector(`#${inputId}`);
-      input?.addEventListener("keydown", (event) => {
-        if (event.key !== "Enter") return;
-        event.preventDefault();
-        cleanupDialog(backdrop);
-        resolve(input.value.trim() || "");
-      });
-      setTimeout(() => input?.focus(), 0);
-      attachDialogLifecycle(backdrop, () => resolve(null));
-    });
-  }
-
-  function renderDialog({ title, message, body = "", actions = [] }) {
-    const backdrop = document.createElement("div");
-    backdrop.className = "dialog-backdrop";
-    backdrop.innerHTML = `
-      <div class="dialog-card" role="dialog" aria-modal="true">
-        <h3>${escapeHtml(title)}</h3>
-        <p>${escapeHtml(message)}</p>
-        ${body}
-        <div class="dialog-actions"></div>
-      </div>
-    `;
-    const actionWrap = backdrop.querySelector(".dialog-actions");
-    actions.forEach((action) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = action.style === "primary" ? "primary-button" : "ghost-button";
-      button.textContent = action.label;
-      button.addEventListener("click", () => {
-        cleanupDialog(backdrop);
-        action.onClick?.(backdrop);
-      });
-      actionWrap.appendChild(button);
-    });
-    document.body.appendChild(backdrop);
-    return backdrop;
-  }
-
-  function attachDialogLifecycle(backdrop, onDismiss) {
-    backdrop.addEventListener("click", (event) => {
-      if (event.target !== backdrop) return;
-      cleanupDialog(backdrop);
-      onDismiss?.();
-    });
-    const onKeydown = (event) => {
-      if (event.key !== "Escape") return;
-      cleanupDialog(backdrop);
-      onDismiss?.();
-    };
-    backdrop.__dialogKeydown = onKeydown;
-    window.addEventListener("keydown", onKeydown, { once: true });
-  }
-
-  function cleanupDialog(backdrop) {
-    if (!backdrop?.isConnected) return;
-    const onKeydown = backdrop.__dialogKeydown;
-    if (onKeydown) window.removeEventListener("keydown", onKeydown);
-    backdrop.remove();
   }
 
   function showValidation(errors) {
@@ -1090,9 +754,7 @@
   function showSignMessage(message, tone = "warn") {
     const box = document.getElementById("signMessage");
     box.hidden = false;
-    box.innerHTML = `
-      <div>${escapeHtml(message)}</div>
-    `;
+    box.textContent = message;
     box.style.background = tone === "ok" ? "#eaf7ef" : "#fff7e7";
     box.style.color = tone === "ok" ? "#237044" : "#83540f";
   }
@@ -1161,11 +823,18 @@
     });
 
     canvas.addEventListener("pointerup", (event) => {
+      const wasDrawing = drawing;
       drawing = false;
       try {
         canvas.releasePointerCapture(event.pointerId);
       } catch (error) {
         // Pointer capture may already be released.
+      }
+      if (wasDrawing && contract?.status === "draft") {
+        contract.fields.partyASignature = canvas.toDataURL("image/png");
+        contract.updatedAt = nowIso();
+        saveStore(true);
+        renderPreview();
       }
     });
 
@@ -1183,7 +852,7 @@
     if (!canvas) return;
     const contract = currentContract();
     const context = canvas.getContext("2d");
-    const canEdit = canEditContract(contract);
+    const canEdit = contract?.status === "draft";
     let drawing = false;
 
     function resize() {
@@ -1239,22 +908,20 @@
     });
 
     document.getElementById("clearPartyASignBtn")?.addEventListener("click", () => {
-      if (!canEditContract(contract)) return;
+      if (!contract || contract.status !== "draft") return;
       context.clearRect(0, 0, canvas.width, canvas.height);
       contract.fields.partyASignature = "";
-      markContractChanged(contract);
+      contract.updatedAt = nowIso();
       saveStore(true);
-      refreshShareLink(contract);
       renderForm();
       renderPreview();
     });
 
     document.getElementById("savePartyASignBtn")?.addEventListener("click", () => {
-      if (!canEditContract(contract)) return;
-      contract.fields.partyASignature = compactCanvasDataUrl(canvas, 320, 0.72);
-      markContractChanged(contract);
+      if (!contract || contract.status !== "draft") return;
+      contract.fields.partyASignature = canvas.toDataURL("image/png");
+      contract.updatedAt = nowIso();
       saveStore(true);
-      refreshShareLink(contract);
       renderForm();
       renderPreview();
     });
@@ -1267,50 +934,7 @@
     const context = canvas.getContext("2d");
     context.clearRect(0, 0, canvas.width, canvas.height);
     signatureDirty = false;
-    signerUploadImageData = "";
-    const uploadInput = document.getElementById("signerUpload");
-    if (uploadInput) uploadInput.value = "";
-    renderSigner();
     if (showMessage) showSignMessage("签名已清除。");
-  }
-
-  function compactSignatureDataUrl(sourceCanvas) {
-    return compactCanvasDataUrl(sourceCanvas, 720, 0.82);
-  }
-
-  function compactCanvasDataUrl(sourceCanvas, targetWidth = 720, quality = 0.82) {
-    const target = document.createElement("canvas");
-    const sourceRatio = sourceCanvas.width && sourceCanvas.height ? sourceCanvas.width / sourceCanvas.height : 3;
-    target.width = targetWidth;
-    target.height = Math.max(140, Math.round(target.width / sourceRatio));
-    const context = target.getContext("2d");
-    context.fillStyle = "#fff";
-    context.fillRect(0, 0, target.width, target.height);
-    context.drawImage(sourceCanvas, 0, 0, target.width, target.height);
-    return target.toDataURL("image/jpeg", quality);
-  }
-
-  function compactImageDataUrl(dataUrl, targetWidth = 560, quality = 0.8) {
-    return new Promise((resolve) => {
-      if (!dataUrl) {
-        resolve("");
-        return;
-      }
-      const image = new Image();
-      image.onload = () => {
-        const target = document.createElement("canvas");
-        const sourceRatio = image.width && image.height ? image.width / image.height : 3;
-        target.width = targetWidth;
-        target.height = Math.max(140, Math.round(target.width / sourceRatio));
-        const context = target.getContext("2d");
-        context.fillStyle = "#fff";
-        context.fillRect(0, 0, target.width, target.height);
-        context.drawImage(image, 0, 0, target.width, target.height);
-        resolve(target.toDataURL("image/jpeg", quality));
-      };
-      image.onerror = () => resolve(String(dataUrl));
-      image.src = String(dataUrl);
-    });
   }
 
   function loadStore() {
@@ -1320,26 +944,13 @@
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed.contracts) && parsed.contracts.length) {
           parsed.contracts = parsed.contracts.map(normalizeContract);
-          parsed.brandOptions = Array.isArray(parsed.brandOptions)
-            ? normalizeOptions(parsed.brandOptions)
-            : normalizeOptions([], DEFAULT_BRAND_OPTIONS, parsed.contracts.map((contract) => contract.fields.brand));
-          parsed.platformOptions = Array.isArray(parsed.platformOptions)
-            ? normalizeOptions(parsed.platformOptions)
-            : normalizeOptions([], DEFAULT_PLATFORM_OPTIONS, parsed.contracts.map((contract) => contract.fields.platform));
           parsed.clauseVersions = normalizeClauseVersions(parsed.clauseVersions);
-          const seededVersion = parsed.clauseVersions.find((version) => version.seedVersion === CLAUSE_SEED_VERSION);
-          if (seededVersion && parsed.lastAppliedClauseSeed !== CLAUSE_SEED_VERSION) {
-            parsed.activeClauseVersionId = seededVersion.id;
-            parsed.lastAppliedClauseSeed = CLAUSE_SEED_VERSION;
-          } else {
-            parsed.activeClauseVersionId = parsed.clauseVersions.some((version) => version.id === parsed.activeClauseVersionId)
-              ? parsed.activeClauseVersionId
-              : parsed.clauseVersions[parsed.clauseVersions.length - 1].id;
-          }
+          parsed.activeClauseVersionId = parsed.clauseVersions.some((version) => version.id === parsed.activeClauseVersionId)
+            ? parsed.activeClauseVersionId
+            : parsed.clauseVersions[parsed.clauseVersions.length - 1].id;
           if (!parsed.contracts.some((contract) => contract.id === parsed.selectedId)) {
             parsed.selectedId = parsed.contracts[0].id;
           }
-          if (seededVersion) localStorage.setItem(STORE_KEY, JSON.stringify(parsed));
           return parsed;
         }
       } catch (error) {
@@ -1348,21 +959,11 @@
     }
     const contract = makeContract();
     const clauseVersions = seedClauseVersions();
-    return {
-      selectedId: contract.id,
-      contracts: [contract],
-      brandOptions: normalizeOptions([], DEFAULT_BRAND_OPTIONS, [contract.fields.brand]),
-      platformOptions: normalizeOptions([], DEFAULT_PLATFORM_OPTIONS, [contract.fields.platform]),
-      clauseVersions,
-      activeClauseVersionId: clauseVersions[0].id,
-      lastAppliedClauseSeed: CLAUSE_SEED_VERSION,
-    };
+    return { selectedId: contract.id, contracts: [contract], clauseVersions, activeClauseVersionId: clauseVersions[0].id };
   }
 
   function normalizeContract(contract) {
-    const rawFields = contract.fields || {};
-    const fields = { ...DEFAULT_FIELDS, ...rawFields };
-    normalizePlatformFields(fields, rawFields);
+    const fields = { ...DEFAULT_FIELDS, ...(contract.fields || {}) };
     if (!fields.firstReviewDate && fields.reviewDate) fields.firstReviewDate = fields.reviewDate;
     if (!fields.finalReviewDate && fields.reviewDate) fields.finalReviewDate = fields.reviewDate;
     if (!fields.partyBPhone && fields.phone) fields.partyBPhone = fields.phone;
@@ -1370,147 +971,26 @@
     if (!fields.sampleShippingInfo) fields.sampleShippingInfo = DEFAULT_FIELDS.sampleShippingInfo;
     if (fields.sampleShippingInfo === "寄样") fields.sampleShippingInfo = "已寄样";
     if (fields.sampleShippingInfo === "不寄样" || fields.sampleShippingInfo === "待确认") fields.sampleShippingInfo = "未寄样";
-    const snapshot = normalizeSnapshot(contract.snapshot, fields);
-    const signature = contract.signature || snapshot?.signature || null;
-    const normalized = {
+    return {
       ...contract,
       token: contract.token || randomToken(18),
       audit: Array.isArray(contract.audit) ? contract.audit : [],
       fields,
-      snapshot,
-      signature,
+      snapshot: contract.snapshot
+        ? {
+            ...contract.snapshot,
+            fields: {
+              ...DEFAULT_FIELDS,
+              ...(contract.snapshot.fields || fields),
+              firstReviewDate: contract.snapshot.fields?.firstReviewDate || contract.snapshot.fields?.reviewDate || fields.firstReviewDate,
+              finalReviewDate: contract.snapshot.fields?.finalReviewDate || contract.snapshot.fields?.reviewDate || fields.finalReviewDate,
+              partyBPhone: contract.snapshot.fields?.partyBPhone || contract.snapshot.fields?.phone || fields.partyBPhone,
+              retentionDate: contract.snapshot.fields?.retentionDate || normalizeDateLike(contract.snapshot.fields?.retentionPeriod) || fields.retentionDate,
+              sampleShippingInfo: contract.snapshot.fields?.sampleShippingInfo || fields.sampleShippingInfo,
+            },
+          }
+        : null,
     };
-    if (normalized.status === "signed" && normalized.signature?.imageData) {
-      syncSignedSignature(normalized);
-    }
-    return normalized;
-  }
-
-  function normalizeSnapshot(snapshot, fields) {
-    if (!snapshot) return null;
-    const rawSnapshotFields = snapshot.fields || fields;
-    const normalized = {
-      ...snapshot,
-      fields: {
-        ...DEFAULT_FIELDS,
-        ...rawSnapshotFields,
-        firstReviewDate: rawSnapshotFields.firstReviewDate || rawSnapshotFields.reviewDate || fields.firstReviewDate,
-        finalReviewDate: rawSnapshotFields.finalReviewDate || rawSnapshotFields.reviewDate || fields.finalReviewDate,
-        partyBPhone: rawSnapshotFields.partyBPhone || rawSnapshotFields.phone || fields.partyBPhone,
-        retentionDate: rawSnapshotFields.retentionDate || normalizeDateLike(rawSnapshotFields.retentionPeriod) || fields.retentionDate,
-        sampleShippingInfo: rawSnapshotFields.sampleShippingInfo || fields.sampleShippingInfo,
-      },
-    };
-    normalizePlatformFields(normalized.fields, rawSnapshotFields);
-    if (normalized.clauseSeedVersion !== CLAUSE_SEED_VERSION) {
-      normalized.clauses = clone(DEFAULT_CLAUSES);
-      normalized.clauseVersion = CLAUSE_SEED_LABEL;
-      normalized.clauseSeedVersion = CLAUSE_SEED_VERSION;
-    }
-    return normalized;
-  }
-
-  function normalizeOptions(values, defaults = [], extras = []) {
-    const seen = new Set();
-    return [...defaults, ...(Array.isArray(values) ? values : []), ...extras]
-      .map((value) => String(value || "").trim())
-      .filter((value) => {
-        const key = value.toLowerCase();
-        if (!value || seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-  }
-
-  function normalizePlatformFields(fields, rawFields = {}) {
-    if (rawFields.platform) {
-      fields.platform = String(rawFields.platform).trim() || DEFAULT_FIELDS.platform;
-      fields.platformAccount = String(rawFields.platformAccount || "").trim();
-      return;
-    }
-    const split = splitPlatformAccount(rawFields.platformAccount ?? fields.platformAccount);
-    fields.platform = split.platform || fields.platform || DEFAULT_FIELDS.platform;
-    fields.platformAccount = split.account || "";
-  }
-
-  function splitPlatformAccount(value) {
-    const text = String(value || "").trim();
-    if (!text) return { platform: "", account: "" };
-    const parts = text.split(/\s*(?:\/|｜|\||,|，)\s*/).filter(Boolean);
-    if (parts.length > 1) {
-      return { platform: parts[0].trim(), account: parts.slice(1).join(" / ").trim() };
-    }
-    const known = DEFAULT_PLATFORM_OPTIONS.find((option) => option.toLowerCase() === text.toLowerCase());
-    if (known) return { platform: known, account: "" };
-    const prefix = DEFAULT_PLATFORM_OPTIONS.find((option) => text.toLowerCase().startsWith(option.toLowerCase()));
-    if (prefix && text.length > prefix.length) {
-      return {
-        platform: prefix,
-        account: text.slice(prefix.length).replace(/^[\s:：/｜|,，-]+/, "").trim(),
-      };
-    }
-    return { platform: text, account: "" };
-  }
-
-  function formatPlatformLine(fields) {
-    const platform = fields.platform || "-";
-    const account = fields.platformAccount ? ` / ${fields.platformAccount}` : "";
-    return `${platform}${account}`;
-  }
-
-  function canEditContract(contract) {
-    return Boolean(contract) && !LOCKED_STATUSES.includes(contract.status);
-  }
-
-  function canEditSigner(contract) {
-    return Boolean(contract) && ["published", "confirmed"].includes(contract.status);
-  }
-
-  function markContractChanged(contract) {
-    if (!contract) return;
-    if (contract.status === "signed") {
-      contract.status = "published";
-      contract.signature = null;
-      contract.signedAt = "";
-      contract.confirmedAt = "";
-      contract.audit = Array.isArray(contract.audit) ? contract.audit : [];
-      contract.audit.push(makeAudit("甲方修改合同", "已签署合同被甲方修改，原乙方签名失效，需重新签署"));
-    }
-    contract.updatedAt = nowIso();
-    syncContractSnapshot(contract);
-  }
-
-  function syncContractSnapshot(contract) {
-    if (!contract || contract.status === "draft") return;
-    contract.snapshot = {
-      ...(contract.snapshot || {}),
-      fields: clone(contract.fields),
-      clauses: clone(DEFAULT_CLAUSES),
-      clauseVersion: CLAUSE_SEED_LABEL,
-      clauseSeedVersion: CLAUSE_SEED_VERSION,
-      publishedAt: contract.publishedAt || contract.snapshot?.publishedAt || nowIso(),
-    };
-    syncSignedSignature(contract);
-  }
-
-  function syncSignedSignature(contract) {
-    if (!contract?.signature?.imageData) return;
-    contract.snapshot = {
-      ...(contract.snapshot || {}),
-      fields: clone(contract.snapshot?.fields || contract.fields),
-      clauses: clone(DEFAULT_CLAUSES),
-      clauseVersion: CLAUSE_SEED_LABEL,
-      clauseSeedVersion: CLAUSE_SEED_VERSION,
-      publishedAt: contract.publishedAt || contract.snapshot?.publishedAt || nowIso(),
-      signature: clone(contract.signature),
-      signedAt: contract.signedAt || contract.signature.signedAt || nowIso(),
-    };
-  }
-
-  function refreshShareLink(contract) {
-    const shareInput = document.getElementById("shareLink");
-    if (!shareInput || !contract || !["published", "confirmed", "signed"].includes(contract.status)) return;
-    shareInput.value = buildSignLink(contract);
   }
 
   function saveStore(announce) {
@@ -1543,7 +1023,7 @@
 
   function signerContract() {
     if (signerToken) {
-      return store.contracts.find((contract) => contract.token === signerToken) || signerPayloadContract || null;
+      return store.contracts.find((contract) => contract.token === signerToken) || null;
     }
     return currentContract();
   }
@@ -1554,7 +1034,8 @@
   }
 
   function renderClausesForContract(contract) {
-    return DEFAULT_CLAUSES;
+    if (contract.snapshot && contract.status !== "draft") return contract.snapshot.clauses;
+    return activeClauseVersion().sections;
   }
 
   function activeClauseVersion() {
@@ -1570,11 +1051,10 @@
   function seedClauseVersions() {
     return [
       {
-        id: `clause-${CLAUSE_SEED_VERSION}`,
-        version: CLAUSE_SEED_LABEL,
+        id: "clause-v1",
+        version: "V1.0",
         maintainer: "甲方",
         updatedAt: nowIso(),
-        seedVersion: CLAUSE_SEED_VERSION,
         sections: clone(DEFAULT_CLAUSES),
       },
     ];
@@ -1582,38 +1062,19 @@
 
   function normalizeClauseVersions(versions) {
     if (!Array.isArray(versions) || !versions.length) return seedClauseVersions();
-    const normalized = versions.map((version, index) => ({
+    return versions.map((version, index) => ({
       id: version.id || `clause-v${index + 1}`,
       version: version.version || `V1.${index}`,
       maintainer: version.maintainer || "甲方",
       updatedAt: version.updatedAt || nowIso(),
-      seedVersion: version.seedVersion || "",
       sections: Array.isArray(version.sections) && version.sections.length ? version.sections : clone(DEFAULT_CLAUSES),
     }));
-    if (!normalized.some((version) => version.seedVersion === CLAUSE_SEED_VERSION)) {
-      normalized.push(seedClauseVersions()[0]);
-    }
-    return normalized;
   }
 
   function parseHashRoute() {
-    signerPayloadContract = null;
-    const hash = location.hash.slice(1);
-    if (hash.startsWith(`${SIGN_HASH_KEY}=`) || hash.startsWith("sign=")) {
-      const params = new URLSearchParams(hash);
-      signerToken = params.get(SIGN_HASH_KEY) || params.get("sign") || "";
-      signerPayloadContract = decodeSignPayload(params.get(SIGN_PAYLOAD_KEY) || params.get("payload"), signerToken);
-      hydrateSignerPayloadContract();
+    if (location.hash.startsWith("#sign=")) {
+      signerToken = decodeURIComponent(location.hash.slice("#sign=".length));
       activeView = "signer";
-    } else if (hash.startsWith("signed=")) {
-      const params = new URLSearchParams(hash);
-      const imported = decodeSignedPayload(params.get("payload"), params.get("signed") || "");
-      signerToken = "";
-      activeView = "editor";
-      if (imported) {
-        importSignedContract(imported);
-        history.replaceState(null, "", location.pathname + location.search);
-      }
     } else {
       signerToken = "";
     }
@@ -1642,194 +1103,7 @@
   }
 
   function buildSignLink(contract) {
-    const payload = encodeSignPayload(contract);
-    return `${location.href.split("#")[0]}#${SIGN_HASH_KEY}=${encodeURIComponent(contract.token)}&${SIGN_PAYLOAD_KEY}=${encodeURIComponent(payload)}`;
-  }
-
-  function encodeSignPayload(contract) {
-    const fields = clone(contract.snapshot?.fields || contract.fields);
-    return encodePayload({
-      v: SIGN_LINK_VERSION,
-      s: SIGN_STATUS_TO_CODE[contract.status] || SIGN_STATUS_TO_CODE.published,
-      f: compactShareFields(fields),
-    });
-  }
-
-  function decodeSignPayload(payload, token) {
-    if (!payload || !token) return null;
-    try {
-      const decoded = JSON.parse(decodePayload(payload));
-      if (decoded.v === SIGN_LINK_VERSION || decoded.f) {
-        const fields = expandShareFields(decoded.f || {});
-        return normalizeContract({
-          id: randomToken(12),
-          status: SIGN_CODE_TO_STATUS[decoded.s] || "published",
-          token,
-          fields,
-          snapshot: {
-            fields: clone(fields),
-            clauses: clone(DEFAULT_CLAUSES),
-            clauseVersion: CLAUSE_SEED_LABEL,
-            clauseSeedVersion: CLAUSE_SEED_VERSION,
-            publishedAt: nowIso(),
-          },
-          signature: null,
-          audit: [],
-          publishedAt: nowIso(),
-          createdAt: nowIso().slice(0, 10),
-          updatedAt: nowIso(),
-        });
-      }
-      if (decoded.token && decoded.token !== token) return null;
-      return normalizeContract({
-        id: decoded.id || randomToken(12),
-        status: ["published", "confirmed", "signed"].includes(decoded.status) ? decoded.status : "published",
-        token,
-        fields: decoded.fields || decoded.snapshot?.fields || {},
-        snapshot: decoded.snapshot || {
-          fields: decoded.fields || {},
-          clauses: clone(DEFAULT_CLAUSES),
-          clauseVersion: CLAUSE_SEED_LABEL,
-          clauseSeedVersion: CLAUSE_SEED_VERSION,
-          publishedAt: decoded.publishedAt || nowIso(),
-        },
-        signature: decoded.signature || null,
-        audit: [],
-        publishedAt: decoded.publishedAt || decoded.snapshot?.publishedAt || nowIso(),
-        createdAt: decoded.createdAt || nowIso().slice(0, 10),
-        updatedAt: decoded.updatedAt || nowIso(),
-      });
-    } catch (error) {
-      console.warn("Failed to decode sign payload", error);
-      return null;
-    }
-  }
-
-  function decodeSignedPayload(payload, token) {
-    if (!payload || !token) return null;
-    try {
-      const decoded = JSON.parse(decodePayload(payload));
-      if (decoded.token !== token || !decoded.signature?.imageData) return null;
-      return normalizeContract({
-        id: decoded.id || randomToken(12),
-        status: "signed",
-        token,
-        fields: decoded.fields || decoded.snapshot?.fields || {},
-        snapshot: decoded.snapshot || null,
-        signature: decoded.signature,
-        signedAt: decoded.signedAt || decoded.signature.signedAt || nowIso(),
-        confirmedAt: decoded.confirmedAt || decoded.signature.confirmedAt || "",
-        audit: [],
-        createdAt: nowIso().slice(0, 10),
-        updatedAt: decoded.updatedAt || nowIso(),
-      });
-    } catch (error) {
-      console.warn("Failed to decode signed payload", error);
-      return null;
-    }
-  }
-
-  function compactShareFields(fields) {
-    const compact = {};
-    Object.entries(SHARE_FIELD_KEY_MAP).forEach(([fieldKey, shortKey]) => {
-      let value = fields?.[fieldKey];
-      if (fieldKey === "amountUpper") return;
-      if (value == null) return;
-      value = String(value).trim();
-      if (!value) return;
-      if (String(DEFAULT_FIELDS[fieldKey] ?? "").trim() === value) return;
-      compact[shortKey] = value;
-    });
-    return compact;
-  }
-
-  function expandShareFields(compactFields) {
-    const fields = { ...DEFAULT_FIELDS };
-    Object.entries(compactFields || {}).forEach(([shortKey, value]) => {
-      const fieldKey = SHARE_FIELD_KEY_MAP_REVERSE[shortKey];
-      if (!fieldKey) return;
-      fields[fieldKey] = value;
-    });
-    fields.amountUpper = moneyToChinese(fields.price);
-    return fields;
-  }
-
-  function importSignedContract(imported) {
-    const existing = store.contracts.find((contract) => contract.token === imported.token || contract.id === imported.id);
-    const target = existing || imported;
-    if (existing) {
-      existing.status = "signed";
-      existing.fields = clone(imported.fields);
-      existing.snapshot = clone(imported.snapshot || existing.snapshot || null);
-      existing.signature = clone(imported.signature);
-      existing.signedAt = imported.signedAt;
-      existing.confirmedAt = imported.confirmedAt;
-      existing.updatedAt = nowIso();
-      syncSignedSignature(existing);
-      existing.audit = Array.isArray(existing.audit) ? existing.audit : [];
-      existing.audit.push(makeAudit("导入乙方签署", `${imported.signature.signerName || "乙方"} 的签名已回传`));
-    } else {
-      imported.audit = [makeAudit("导入乙方签署", `${imported.signature.signerName || "乙方"} 的签名已回传`)];
-      syncSignedSignature(imported);
-      store.contracts.unshift(imported);
-    }
-    store.selectedId = target.id;
-    saveStore(false);
-  }
-
-  function hydrateSignerPayloadContract() {
-    if (!signerToken || !signerPayloadContract) return;
-    const existing = store.contracts.find((contract) => contract.token === signerToken);
-    if (existing) {
-      const existingSignature = existing.signature || existing.snapshot?.signature || null;
-      existing.status = existing.status === "signed" && !signerPayloadContract.signature ? "signed" : signerPayloadContract.status;
-      existing.fields = clone(signerPayloadContract.fields);
-      existing.snapshot = clone(signerPayloadContract.snapshot);
-      existing.signature = clone(signerPayloadContract.signature || existingSignature || null);
-      existing.signedAt = signerPayloadContract.signedAt || existing.signedAt || "";
-      existing.confirmedAt = signerPayloadContract.confirmedAt || existing.confirmedAt || "";
-      existing.publishedAt = signerPayloadContract.publishedAt;
-      existing.updatedAt = signerPayloadContract.updatedAt;
-      if (existing.signature?.imageData) syncSignedSignature(existing);
-      store.selectedId = existing.id;
-    } else {
-      store.contracts.unshift(signerPayloadContract);
-      store.selectedId = signerPayloadContract.id;
-    }
-    store.brandOptions = normalizeOptions(
-      Array.isArray(store.brandOptions) ? store.brandOptions : [],
-      Array.isArray(store.brandOptions) ? [] : DEFAULT_BRAND_OPTIONS,
-      [signerPayloadContract.fields.brand],
-    );
-    store.platformOptions = normalizeOptions(
-      Array.isArray(store.platformOptions) ? store.platformOptions : [],
-      Array.isArray(store.platformOptions) ? [] : DEFAULT_PLATFORM_OPTIONS,
-      [signerPayloadContract.fields.platform],
-    );
-    saveStore(false);
-  }
-
-  function encodePayload(value) {
-    const json = JSON.stringify(value);
-    if (window.TextEncoder) {
-      const bytes = new TextEncoder().encode(json);
-      let binary = "";
-      bytes.forEach((byte) => {
-        binary += String.fromCharCode(byte);
-      });
-      return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-    }
-    return btoa(unescape(encodeURIComponent(json))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-  }
-
-  function decodePayload(value) {
-    const base64 = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
-    const binary = atob(base64);
-    if (window.TextDecoder) {
-      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-      return new TextDecoder().decode(bytes);
-    }
-    return decodeURIComponent(escape(binary));
+    return `${location.href.split("#")[0]}#sign=${encodeURIComponent(contract.token)}`;
   }
 
   function createChannel() {

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>合同生成系统</title>
-    <link rel="stylesheet" href="./styles.css?v=stability-pass-20260424" />
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body class="auth-locked">
     <section class="auth-screen" aria-label="甲方登录">
@@ -41,7 +41,7 @@
             <h2>合同库</h2>
             <span id="contractCount">0</span>
           </div>
-          <input id="searchInput" class="search-input" type="search" placeholder="搜索品牌、博主、平台" />
+          <input id="searchInput" class="search-input" type="search" placeholder="搜索品牌、博主、编号" />
           <div class="month-stats">
             <strong>本月统计</strong>
             <div><span>合同数</span><b id="monthCount">0</b></div>
@@ -80,7 +80,7 @@
               <section class="card preview-card signer-contract-card">
                 <div class="card-head">
                   <div>
-                    <h2>达人内容发布合作协议</h2>
+                    <h2>合同</h2>
                     <span id="signerMeta">待发布</span>
                   </div>
                 </div>
@@ -102,11 +102,6 @@
                   <input id="confirmCheckbox" type="checkbox" />
                   <span>已确认合同内容无误</span>
                 </label>
-                <label class="field signer-upload-field">
-                  <span>签名上传</span>
-                  <input id="signerUpload" type="file" accept="image/*" />
-                </label>
-                <div id="signerUploadState" class="signer-upload-state">可上传签名图片，或直接手写签名。</div>
                 <div class="signature-pad">
                   <canvas id="signatureCanvas" aria-label="电子手写签名"></canvas>
                 </div>
@@ -136,6 +131,6 @@
     </div>
 
     <div id="printRoot" aria-hidden="true"></div>
-    <script src="./app.js?v=stability-pass-20260424"></script>
+    <script src="./app.js"></script>
   </body>
 </html>

@@ -328,102 +328,6 @@ textarea:disabled {
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
-.select-manager {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 6px;
-  align-items: center;
-}
-
-.select-manager select {
-  min-width: 0;
-}
-
-.select-manager .option-button {
-  min-height: 34px;
-  white-space: nowrap;
-}
-
-.select-manager .danger-option {
-  border-color: #edc5c5;
-  color: var(--danger);
-}
-
-.managed-combo {
-  display: grid;
-  gap: 7px;
-}
-
-.combo-input-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px;
-}
-
-.combo-toggle,
-.combo-add-row button,
-.combo-option button {
-  min-height: 34px;
-  border: 1px solid #cbd5e1;
-  border-radius: 5px;
-  background: #fff;
-  color: #263241;
-  padding: 0 10px;
-  font-size: 12px;
-}
-
-.combo-toggle {
-  min-width: 58px;
-}
-
-.combo-panel {
-  display: grid;
-  gap: 8px;
-  padding: 8px;
-  border: 1px solid #dbe3ee;
-  border-radius: 6px;
-  background: #fff;
-}
-
-.combo-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.combo-option {
-  display: inline-flex;
-  overflow: hidden;
-  border: 1px solid #dbe3ee;
-  border-radius: 5px;
-  background: #f8fafc;
-}
-
-.combo-option button {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-.combo-option .combo-delete {
-  min-width: 28px;
-  padding: 0 8px;
-  border-left: 1px solid #dbe3ee;
-  color: var(--danger);
-}
-
-.combo-add-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px;
-}
-
-.combo-empty {
-  color: var(--muted);
-  font-size: 12px;
-  font-style: normal;
-}
-
 .retention-control {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -484,6 +388,7 @@ textarea:disabled {
   border: 1px solid var(--line);
   border-radius: 6px;
   background: #fff;
+  text-align: left;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
@@ -495,15 +400,8 @@ textarea:disabled {
   border-color: var(--accent);
 }
 
-.contract-item-main {
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  text-align: left;
-}
-
 .contract-item strong,
+.contract-item-main,
 .contract-item-main span {
   display: block;
   overflow: hidden;
@@ -646,9 +544,8 @@ textarea:disabled {
 }
 
 .party-a-sign-pad {
-  width: min(100%, 720px);
-  min-height: 300px;
-  aspect-ratio: 2 / 1;
+  width: min(100%, 320px);
+  aspect-ratio: 4 / 1;
   border: 1px dashed var(--line-strong);
   border-radius: 6px;
   background: #fff;
@@ -855,16 +752,6 @@ textarea:disabled {
   height: 18px;
 }
 
-.signer-upload-field {
-  margin-top: 0;
-}
-
-.signer-upload-state {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
 .signature-pad {
   width: 100%;
   aspect-ratio: 3 / 1;
@@ -886,69 +773,6 @@ textarea:disabled {
   border-radius: 5px;
   background: #f4f7fb;
   line-height: 1.45;
-}
-
-.dialog-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  display: grid;
-  place-items: center;
-  padding: 18px;
-  background: rgba(15, 23, 42, 0.28);
-}
-
-.dialog-card {
-  width: min(100%, 420px);
-  display: grid;
-  gap: 12px;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
-}
-
-.dialog-card h3 {
-  margin: 0;
-  font-size: 16px;
-}
-
-.dialog-card p {
-  margin: 0;
-  color: #475569;
-  font-size: 13px;
-  line-height: 1.55;
-}
-
-.dialog-card input {
-  height: 38px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 0 10px;
-  outline: none;
-}
-
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.sign-return-box {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.sign-return-box input {
-  min-width: 0;
-  height: 34px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  padding: 0 8px;
-  color: var(--ink);
 }
 
 .clause-list {
@@ -1156,26 +980,6 @@ body.exporting-pdf .contract-page {
     font-size: 15px;
   }
 
-  .select-manager {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .select-manager select {
-    grid-column: 1 / -1;
-    height: 42px;
-    font-size: 15px;
-  }
-
-  .select-manager .option-button {
-    width: 100%;
-    min-height: 40px;
-  }
-
-  .party-a-sign-pad {
-    min-height: 220px;
-    aspect-ratio: auto;
-  }
-
   .signature-grid {
     grid-template-columns: 1fr;
     gap: 14px;
@@ -1275,10 +1079,6 @@ body.exporting-pdf .contract-page {
     min-height: 46px;
     border-radius: 7px;
     font-size: 15px;
-  }
-
-  .sign-return-box {
-    grid-template-columns: 1fr;
   }
 
   .status-note {
