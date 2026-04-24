@@ -167,6 +167,7 @@
   let signerToken = "";
   let signerPayloadContract = null;
   let signatureDirty = false;
+  let signerUploadImageData = "";
   let canvasReady = false;
   let resizeSignatureCanvas = () => {};
 
@@ -228,6 +229,8 @@
     document.getElementById("clearSignBtn").addEventListener("click", () => clearSignatureCanvas(true));
     document.getElementById("submitSignBtn").addEventListener("click", submitSignature);
     document.getElementById("confirmCheckbox").addEventListener("change", confirmSigner);
+    document.getElementById("signerUpload").addEventListener("change", handleSignerUploadChange);
+    document.getElementById("contractForm").addEventListener("submit", (event) => event.preventDefault());
     document.getElementById("contractForm").addEventListener("input", handleFieldInput);
     document.getElementById("contractForm").addEventListener("change", handleFieldChange);
     document.getElementById("contractForm").addEventListener("click", handleComboAction);
@@ -275,14 +278,14 @@
       .map((contract) => {
         const status = STATUS[contract.status] || STATUS.draft;
         return `
-          <button class="contract-item${contract.id === store.selectedId ? " is-active" : ""}" type="button" data-contract-id="${escapeAttr(contract.id)}">
-            <span class="contract-item-main">
+          <div class="contract-item${contract.id === store.selectedId ? " is-active" : ""}">
+            <button class="contract-item-main" type="button" data-contract-id="${escapeAttr(contract.id)}">
               <strong>${escapeHtml(contract.fields.brand || "未命名合同")}</strong>
               <span>${escapeHtml(contract.fields.creatorName || "-")} · ${escapeHtml(formatPlatformLine(contract.fields))}</span>
               <em class="status-pill ${status.className}">${status.label}</em>
-            </span>
-            <span class="delete-contract-button" data-delete-contract-id="${escapeAttr(contract.id)}" title="删除合同">删除</span>
-          </button>
+            </button>
+            <button class="delete-contract-button" type="button" data-delete-contract-id="${escapeAttr(contract.id)}" title="删除合同">删除</button>
+          </div>
         `;
       })
       .join("");
@@ -389,10 +392,6 @@
     document.getElementById("previewMeta").textContent = `${status.label} · ${contract.fields.brand || "未命名合同"}`;
     document.getElementById("publishBtn").disabled = contract.status !== "draft";
     document.getElementById("revokeBtn").disabled = !["published", "confirmed"].includes(contract.status);
-    if (!document.activeElement?.closest("#contractForm")) {
-      document.getElementById("contractPreview").innerHTML = renderEditableContractDocument(contract);
-      setupPartyASignatureCanvas();
-    }
     const shareBox = document.getElementById("shareBox");
     if (["published", "confirmed", "signed"].includes(contract.status)) {
       shareBox.hidden = false;
@@ -407,6 +406,9 @@
     const status = document.getElementById("signerStatus");
     const preview = document.getElementById("signerPreview");
     const meta = document.getElementById("signerMeta");
+    const signerNameInput = document.getElementById("signerName");
+    const uploadInput = document.getElementById("signerUpload");
+    const uploadState = document.getElementById("signerUploadState");
     const canSign = contract && ["published", "confirmed"].includes(contract.status);
     if (!contract) {
       status.textContent = signerToken
@@ -414,18 +416,25 @@
         : "暂无可签署达人内容发布合作协议。请先由甲方发布，或打开乙方签署链接。";
       preview.innerHTML = "";
       meta.textContent = "待发布";
+      signerNameInput.value = "";
+      signerUploadImageData = "";
+      uploadInput.value = "";
     } else {
       const statusInfo = STATUS[contract.status] || STATUS.draft;
       status.textContent = `当前状态：${CONTRACT_TITLE} · ${statusInfo.label}`;
       preview.innerHTML = renderContractDocument(contract);
       meta.textContent = `${CONTRACT_TITLE} · ${statusInfo.label}`;
+      if (contract.status === "signed" && contract.signature?.signerName) {
+        signerNameInput.value = contract.signature.signerName;
+      }
     }
-    document.getElementById("signerName").disabled = !canSign;
+    signerNameInput.disabled = !canSign;
     document.getElementById("confirmCheckbox").disabled = !canSign;
     document.getElementById("confirmCheckbox").checked = Boolean(contract && ["confirmed", "signed"].includes(contract.status));
-    if (contract?.status === "signed" && contract.signature?.signerName) {
-      document.getElementById("signerName").value = contract.signature.signerName;
-    }
+    uploadInput.disabled = !canSign;
+    uploadState.textContent = signerUploadImageData
+      ? "已选择签名图片，提交时会优先使用上传图片。"
+      : "可上传签名图片，或直接手写签名。";
     document.getElementById("submitSignBtn").disabled = !canSign;
     document.getElementById("clearSignBtn").disabled = !canSign;
     document.getElementById("signerPrintBtn").disabled = !contract;
@@ -567,7 +576,7 @@
     return next.length !== previous.length;
   }
 
-  function handleComboAction(event) {
+  async function handleComboAction(event) {
     const add = event.target.closest("[data-option-add]");
     const remove = event.target.closest("[data-option-delete]");
     const action = add || remove;
@@ -580,7 +589,7 @@
     if (!canEditContract(contract)) return;
 
     if (add) {
-      const value = window.prompt(`请输入新的${field.label}`)?.trim() || "";
+      const value = (await promptForText(`新增${field.label}`, `请输入新的${field.label}`))?.trim() || "";
       if (!value) return;
       rememberComboOption(key, value);
       contract.fields[key] = value;
@@ -589,7 +598,7 @@
     if (remove) {
       const value = contract.fields[key] || "";
       if (!value) return;
-      const ok = window.confirm(`确定从${field.label}列表删除「${value}」？`);
+      const ok = await confirmAction(`确定从${field.label}列表删除「${value}」？`);
       if (!ok) return;
       removeComboOption(key, value);
       const nextOptions = comboOptions(field);
@@ -722,8 +731,8 @@
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => {
-      contract.fields[key] = reader.result;
+    reader.onload = async () => {
+      contract.fields[key] = await compactImageDataUrl(reader.result, 320, 0.72);
       markContractChanged(contract);
       saveStore(true);
       showValidation([]);
@@ -738,6 +747,7 @@
     store.contracts.unshift(contract);
     store.selectedId = contract.id;
     activeView = "editor";
+    document.getElementById("searchInput").value = "";
     saveStore(true);
     renderAll();
   }
@@ -801,6 +811,7 @@
     const contract = signerContract();
     const signerName = document.getElementById("signerName").value.trim();
     const confirmed = document.getElementById("confirmCheckbox").checked;
+    const hasUploadedSignature = Boolean(signerUploadImageData);
     if (!contract || !["published", "confirmed"].includes(contract.status)) {
       showSignMessage("当前合同不可签署。");
       return;
@@ -813,14 +824,14 @@
       showSignMessage("请输入签署人姓名。");
       return;
     }
-    if (!signatureDirty) {
-      showSignMessage("请先在签名区域手写签名。");
+    if (!signatureDirty && !hasUploadedSignature) {
+      showSignMessage("请先上传签名图片或在签名区域手写签名。");
       return;
     }
     const canvas = document.getElementById("signatureCanvas");
     const signature = {
       signerName,
-      imageData: compactSignatureDataUrl(canvas),
+      imageData: hasUploadedSignature ? signerUploadImageData : compactSignatureDataUrl(canvas),
       confirmedAt: contract.confirmedAt || nowIso(),
       signedAt: nowIso(),
       userAgent: navigator.userAgent,
@@ -832,8 +843,44 @@
     syncSignedSignature(contract);
     contract.audit.push(makeAudit("乙方签署", `${signerName} 完成电子手写签名`));
     saveStore(true);
+    signerUploadImageData = "";
+    document.getElementById("signerUpload").value = "";
+    if (localStorage.getItem(AUTH_KEY) === "ok") {
+      signerToken = "";
+      signerPayloadContract = null;
+      activeView = "editor";
+      history.replaceState(null, "", location.pathname + location.search);
+      applyAuthGate();
+      renderAll();
+      document.getElementById("syncState").textContent = "乙方签名已同步到甲方合同";
+      return;
+    }
     renderAll();
     showSignMessage("签署已完成，甲方端合同签名区会显示乙方签名。", "ok");
+  }
+
+  function handleSignerUploadChange(event) {
+    const contract = signerContract();
+    if (!contract || !canEditSigner(contract)) return;
+    const file = event.target.files?.[0];
+    if (!file) {
+      signerUploadImageData = "";
+      renderSigner();
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      signerUploadImageData = "";
+      event.target.value = "";
+      showSignMessage("请上传图片格式的乙方签名。");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      signerUploadImageData = await compactImageDataUrl(reader.result, 560, 0.8);
+      renderSigner();
+      showSignMessage("签名图片已载入，提交时会同步到甲方端。", "ok");
+    };
+    reader.readAsDataURL(file);
   }
 
   function selectContractFromList(event) {
@@ -854,10 +901,10 @@
     renderAll();
   }
 
-  function deleteContract(contractId) {
+  async function deleteContract(contractId) {
     const contract = store.contracts.find((item) => item.id === contractId);
     if (!contract) return;
-    const ok = window.confirm(`确定删除合同「${contract.fields.brand || contract.fields.creatorName || "未命名合同"}」？`);
+    const ok = await confirmAction(`确定删除合同「${contract.fields.brand || contract.fields.creatorName || "未命名合同"}」？`);
     if (!ok) return;
     store.contracts = store.contracts.filter((item) => item.id !== contractId);
     if (!store.contracts.length) {
@@ -936,6 +983,97 @@
     } catch (error) {
       // Some embedded mobile webviews do not allow programmatic selection.
     }
+  }
+
+  function confirmAction(message) {
+    return new Promise((resolve) => {
+      const backdrop = renderDialog({
+        title: "请确认",
+        message,
+        actions: [
+          { label: "取消", style: "ghost", onClick: () => resolve(false) },
+          { label: "确定", style: "primary", onClick: () => resolve(true) },
+        ],
+      });
+      attachDialogLifecycle(backdrop);
+    });
+  }
+
+  function promptForText(title, message, initialValue = "") {
+    return new Promise((resolve) => {
+      const inputId = `dialog-input-${randomToken(6)}`;
+      const backdrop = renderDialog({
+        title,
+        message,
+        body: `<input id="${inputId}" type="text" value="${escapeAttr(initialValue)}" />`,
+        actions: [
+          { label: "取消", style: "ghost", onClick: () => resolve(null) },
+          {
+            label: "确定",
+            style: "primary",
+            onClick: (root) => resolve(root.querySelector(`#${inputId}`)?.value.trim() || ""),
+          },
+        ],
+      });
+      const input = backdrop.querySelector(`#${inputId}`);
+      input?.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        cleanupDialog(backdrop);
+        resolve(input.value.trim() || "");
+      });
+      setTimeout(() => input?.focus(), 0);
+      attachDialogLifecycle(backdrop, () => resolve(null));
+    });
+  }
+
+  function renderDialog({ title, message, body = "", actions = [] }) {
+    const backdrop = document.createElement("div");
+    backdrop.className = "dialog-backdrop";
+    backdrop.innerHTML = `
+      <div class="dialog-card" role="dialog" aria-modal="true">
+        <h3>${escapeHtml(title)}</h3>
+        <p>${escapeHtml(message)}</p>
+        ${body}
+        <div class="dialog-actions"></div>
+      </div>
+    `;
+    const actionWrap = backdrop.querySelector(".dialog-actions");
+    actions.forEach((action) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = action.style === "primary" ? "primary-button" : "ghost-button";
+      button.textContent = action.label;
+      button.addEventListener("click", () => {
+        cleanupDialog(backdrop);
+        action.onClick?.(backdrop);
+      });
+      actionWrap.appendChild(button);
+    });
+    document.body.appendChild(backdrop);
+    return backdrop;
+  }
+
+  function attachDialogLifecycle(backdrop, onDismiss) {
+    backdrop.addEventListener("click", (event) => {
+      if (event.target !== backdrop) return;
+      cleanupDialog(backdrop);
+      onDismiss?.();
+    });
+    const onKeydown = (event) => {
+      if (event.key !== "Escape") return;
+      cleanupDialog(backdrop);
+      onDismiss?.();
+    };
+    backdrop.__dialogKeydown = onKeydown;
+    window.addEventListener("keydown", onKeydown, { once: true });
+  }
+
+  function cleanupDialog(backdrop) {
+    if (!backdrop?.isConnected) return;
+    const onKeydown = backdrop.__dialogKeydown;
+    if (onKeydown) window.removeEventListener("keydown", onKeydown);
+    backdrop.remove();
   }
 
   function showValidation(errors) {
@@ -1113,7 +1251,7 @@
 
     document.getElementById("savePartyASignBtn")?.addEventListener("click", () => {
       if (!canEditContract(contract)) return;
-      contract.fields.partyASignature = canvas.toDataURL("image/png");
+      contract.fields.partyASignature = compactCanvasDataUrl(canvas, 320, 0.72);
       markContractChanged(contract);
       saveStore(true);
       refreshShareLink(contract);
@@ -1129,19 +1267,50 @@
     const context = canvas.getContext("2d");
     context.clearRect(0, 0, canvas.width, canvas.height);
     signatureDirty = false;
+    signerUploadImageData = "";
+    const uploadInput = document.getElementById("signerUpload");
+    if (uploadInput) uploadInput.value = "";
+    renderSigner();
     if (showMessage) showSignMessage("签名已清除。");
   }
 
   function compactSignatureDataUrl(sourceCanvas) {
+    return compactCanvasDataUrl(sourceCanvas, 720, 0.82);
+  }
+
+  function compactCanvasDataUrl(sourceCanvas, targetWidth = 720, quality = 0.82) {
     const target = document.createElement("canvas");
     const sourceRatio = sourceCanvas.width && sourceCanvas.height ? sourceCanvas.width / sourceCanvas.height : 3;
-    target.width = 720;
-    target.height = Math.max(180, Math.round(target.width / sourceRatio));
+    target.width = targetWidth;
+    target.height = Math.max(140, Math.round(target.width / sourceRatio));
     const context = target.getContext("2d");
     context.fillStyle = "#fff";
     context.fillRect(0, 0, target.width, target.height);
     context.drawImage(sourceCanvas, 0, 0, target.width, target.height);
-    return target.toDataURL("image/jpeg", 0.82);
+    return target.toDataURL("image/jpeg", quality);
+  }
+
+  function compactImageDataUrl(dataUrl, targetWidth = 560, quality = 0.8) {
+    return new Promise((resolve) => {
+      if (!dataUrl) {
+        resolve("");
+        return;
+      }
+      const image = new Image();
+      image.onload = () => {
+        const target = document.createElement("canvas");
+        const sourceRatio = image.width && image.height ? image.width / image.height : 3;
+        target.width = targetWidth;
+        target.height = Math.max(140, Math.round(target.width / sourceRatio));
+        const context = target.getContext("2d");
+        context.fillStyle = "#fff";
+        context.fillRect(0, 0, target.width, target.height);
+        context.drawImage(image, 0, 0, target.width, target.height);
+        resolve(target.toDataURL("image/jpeg", quality));
+      };
+      image.onerror = () => resolve(String(dataUrl));
+      image.src = String(dataUrl);
+    });
   }
 
   function loadStore() {
@@ -1291,6 +1460,10 @@
 
   function canEditContract(contract) {
     return Boolean(contract) && !LOCKED_STATUSES.includes(contract.status);
+  }
+
+  function canEditSigner(contract) {
+    return Boolean(contract) && ["published", "confirmed"].includes(contract.status);
   }
 
   function markContractChanged(contract) {
@@ -1561,7 +1734,6 @@
     Object.entries(SHARE_FIELD_KEY_MAP).forEach(([fieldKey, shortKey]) => {
       let value = fields?.[fieldKey];
       if (fieldKey === "amountUpper") return;
-      if (fieldKey === "partyASignature" && shouldOmitSignatureFromShare(value)) return;
       if (value == null) return;
       value = String(value).trim();
       if (!value) return;
@@ -1580,11 +1752,6 @@
     });
     fields.amountUpper = moneyToChinese(fields.price);
     return fields;
-  }
-
-  function shouldOmitSignatureFromShare(value) {
-    const text = String(value || "").trim();
-    return !text || text.startsWith("data:image/");
   }
 
   function importSignedContract(imported) {

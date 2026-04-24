@@ -484,7 +484,6 @@ textarea:disabled {
   border: 1px solid var(--line);
   border-radius: 6px;
   background: #fff;
-  text-align: left;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
@@ -496,8 +495,15 @@ textarea:disabled {
   border-color: var(--accent);
 }
 
+.contract-item-main {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
 .contract-item strong,
-.contract-item-main,
 .contract-item-main span {
   display: block;
   overflow: hidden;
@@ -849,6 +855,16 @@ textarea:disabled {
   height: 18px;
 }
 
+.signer-upload-field {
+  margin-top: 0;
+}
+
+.signer-upload-state {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .signature-pad {
   width: 100%;
   aspect-ratio: 3 / 1;
@@ -870,6 +886,53 @@ textarea:disabled {
   border-radius: 5px;
   background: #f4f7fb;
   line-height: 1.45;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.dialog-card {
+  width: min(100%, 420px);
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
+}
+
+.dialog-card h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.dialog-card p {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.dialog-card input {
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 10px;
+  outline: none;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .sign-return-box {
