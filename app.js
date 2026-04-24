@@ -227,8 +227,8 @@
     document.querySelectorAll("[data-view]").forEach((button) => {
       button.addEventListener("click", () => {
         activeView = button.dataset.view;
-        if (activeView !== "signer" && isSignerHash()) {
-          history.replaceState(null, "", location.pathname + location.search);
+        if (activeView !== "signer" && isSignerRoute()) {
+          history.replaceState(null, "", location.pathname);
           signerToken = "";
           signerPayloadContract = null;
           signerLinkWarning = "";
@@ -971,8 +971,8 @@
     signerToken = "";
     signerPayloadContract = null;
     signerLinkWarning = "";
-    if (isSignerHash()) {
-      history.replaceState(null, "", location.pathname + location.search);
+    if (isSignerRoute()) {
+      history.replaceState(null, "", location.pathname);
     }
     saveStore(false);
     renderAll();
@@ -1622,8 +1622,7 @@
   function parseHashRoute() {
     signerPayloadContract = null;
     signerLinkWarning = "";
-    const hash = location.hash.slice(1);
-    const params = new URLSearchParams(hash);
+    const params = parseSignerParams();
     const token = params.get(SIGN_HASH_KEY) || params.get("sign") || "";
     if (token) {
       signerToken = token;
@@ -1665,7 +1664,11 @@
 
   function buildSignLink(contract) {
     const payload = encodeSignPayload(contract);
-    return `${location.href.split("#")[0]}#${SIGN_HASH_KEY}=${encodeURIComponent(contract.token)}&${SIGN_PAYLOAD_KEY}=${encodeURIComponent(payload)}`;
+    const url = new URL(location.href);
+    url.searchParams.set(SIGN_HASH_KEY, contract.token);
+    url.searchParams.set(SIGN_PAYLOAD_KEY, payload);
+    url.hash = "";
+    return url.toString();
   }
 
   function encodeSignPayload(contract) {
@@ -1834,7 +1837,16 @@
     if (changed) saveStore(false);
   }
 
-  function isSignerHash() {
+  function parseSignerParams() {
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get(SIGN_HASH_KEY) || searchParams.get("sign")) return searchParams;
+    const hash = location.hash.startsWith("#") ? location.hash.slice(1) : location.hash;
+    return new URLSearchParams(hash);
+  }
+
+  function isSignerRoute() {
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get(SIGN_HASH_KEY) || searchParams.get("sign")) return true;
     return location.hash.startsWith(`#${SIGN_HASH_KEY}=`) || location.hash.startsWith("#sign=");
   }
 
