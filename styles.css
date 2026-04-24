@@ -13,6 +13,14 @@
   color-scheme: light;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+[hidden] {
+  display: none !important;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -92,6 +100,8 @@ select {
 
 button {
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .app-shell {

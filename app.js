@@ -1,4 +1,5 @@
 (() => {
+  const BUILD_TAG = "20260424-mobile-panels-release";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -191,6 +192,8 @@
   init();
 
   function init() {
+    window.__HETONG_BUILD__ = BUILD_TAG;
+    document.documentElement.setAttribute("data-build", BUILD_TAG);
     bindEvents();
     parseHashRoute();
     applyAuthGate();
