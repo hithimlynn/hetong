@@ -835,7 +835,13 @@
       showValidation(["请上传图片格式的甲方签名。"]);
       return;
     }
-    readImageFileAsDataUrl(file, { maxWidth: 640, maxHeight: 180, type: "image/png" })
+    readImageFileAsDataUrl(file, {
+      maxWidth: 420,
+      maxHeight: 120,
+      type: "image/jpeg",
+      quality: 0.8,
+      fillStyle: "#fff",
+    })
       .then((dataUrl) => {
         contract.fields[key] = dataUrl;
         contract.updatedAt = nowIso();
@@ -1283,7 +1289,7 @@
 
     document.getElementById("savePartyASignBtn")?.addEventListener("click", () => {
       if (!contract || contract.status !== "draft") return;
-      contract.fields.partyASignature = canvas.toDataURL("image/png");
+      contract.fields.partyASignature = compactPartyASignatureDataUrl(canvas);
       contract.updatedAt = nowIso();
       saveStore(true);
       renderForm();
@@ -1311,6 +1317,18 @@
     context.fillRect(0, 0, target.width, target.height);
     context.drawImage(sourceCanvas, 0, 0, target.width, target.height);
     return target.toDataURL("image/jpeg", 0.82);
+  }
+
+  function compactPartyASignatureDataUrl(sourceCanvas) {
+    const target = document.createElement("canvas");
+    const sourceRatio = sourceCanvas.width && sourceCanvas.height ? sourceCanvas.width / sourceCanvas.height : 4;
+    target.width = 420;
+    target.height = Math.max(105, Math.round(target.width / sourceRatio));
+    const context = target.getContext("2d");
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, target.width, target.height);
+    context.drawImage(sourceCanvas, 0, 0, target.width, target.height);
+    return target.toDataURL("image/jpeg", 0.78);
   }
 
   function loadStore() {
@@ -1658,11 +1676,12 @@
       clauseSeedVersion: activeClauseVersion().seedVersion || "",
       publishedAt: contract.publishedAt || nowIso(),
     };
+    const shouldSendClauses = shouldInlineClauses(snapshot.clauses || [], snapshot.clauseSeedVersion || "");
     return encodePayload({
       v: SIGN_LINK_VERSION,
       s: SIGN_STATUS_TO_CODE[contract.status] || SIGN_STATUS_TO_CODE.published,
       f: compactShareFields(snapshot.fields || contract.fields),
-      cl: compactClauses(snapshot.clauses || []),
+      ...(shouldSendClauses ? { cl: compactClauses(snapshot.clauses || []) } : {}),
       cv: snapshot.clauseVersion || activeClauseVersion().version,
       cs: snapshot.clauseSeedVersion || activeClauseVersion().seedVersion || "",
       pb: snapshot.publishedAt || contract.publishedAt || nowIso(),
@@ -1714,6 +1733,7 @@
       const value = String(rawValue).trim();
       if (!value) return;
       if (String(DEFAULT_FIELDS[fieldKey] ?? "").trim() === value) return;
+      if (fieldKey === "partyASignature" && value.length > 3200) return;
       compact[shortKey] = value;
     });
     return compact;
@@ -1737,6 +1757,11 @@
       t: clause.title,
       b: Array.isArray(clause.body) ? clause.body : [],
     }));
+  }
+
+  function shouldInlineClauses(clauses, clauseSeedVersion) {
+    if (clauseSeedVersion && clauseSeedVersion === CLAUSE_SEED_VERSION) return false;
+    return JSON.stringify(clauses || []) !== JSON.stringify(DEFAULT_CLAUSES);
   }
 
   function expandClauses(compactClausesValue) {
