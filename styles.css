@@ -676,7 +676,6 @@ textarea:disabled {
 .party-a-sign-pad {
   width: min(100%, 640px);
   aspect-ratio: 4 / 1;
-  min-height: 120px;
   border: 1px dashed var(--line-strong);
   border-radius: 6px;
   background: #fff;
@@ -1123,10 +1122,6 @@ body.exporting-pdf .contract-page {
   .embedded-field textarea {
     min-height: 90px;
     font-size: 15px;
-  }
-
-  .party-a-sign-pad {
-    min-height: 140px;
   }
 
   .signature-grid {
