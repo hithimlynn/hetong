@@ -395,6 +395,17 @@ textarea:disabled {
   align-items: start;
 }
 
+.contract-select-button {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
 .contract-item:hover,
 .contract-item.is-active {
   border-color: var(--accent);
@@ -470,8 +481,10 @@ textarea:disabled {
 
 .signer-grid {
   display: grid;
-  grid-template-columns: minmax(320px, 430px) minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  max-width: 1180px;
+  margin: 0 auto;
   align-items: start;
 }
 
@@ -541,6 +554,22 @@ textarea:disabled {
   color: var(--muted);
   font-size: 12px;
   font-style: normal;
+}
+
+.upload-inline-status {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.signer-upload-preview {
+  display: block;
+  max-width: 220px;
+  max-height: 120px;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  padding: 6px;
 }
 
 .party-a-sign-pad {
@@ -729,6 +758,8 @@ textarea:disabled {
 .signer-card {
   display: grid;
   gap: 12px;
+  width: min(100%, 720px);
+  margin: 0 auto;
 }
 
 .signer-card-head {
@@ -1038,6 +1069,12 @@ body.exporting-pdf .contract-page {
     font-size: 16px;
   }
 
+  .signer-card .field input[type="file"] {
+    height: auto;
+    min-height: 44px;
+    padding: 10px 12px;
+  }
+
   .confirm-line {
     align-items: flex-start;
     min-height: 42px;
@@ -1063,7 +1100,12 @@ body.exporting-pdf .contract-page {
     background-size: 100% 42px;
   }
 
-  .signer-portal .action-row {
+  .signer-upload-preview {
+    max-width: 100%;
+    max-height: 140px;
+  }
+
+  .signer-card .action-row {
     position: static;
     display: grid;
     grid-template-columns: 0.9fr 1.1fr;
@@ -1074,7 +1116,7 @@ body.exporting-pdf .contract-page {
     box-shadow: none;
   }
 
-  .signer-portal .action-row button {
+  .signer-card .action-row button {
     width: 100%;
     min-height: 46px;
     border-radius: 7px;

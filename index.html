@@ -102,6 +102,12 @@
                   <input id="confirmCheckbox" type="checkbox" />
                   <span>已确认合同内容无误</span>
                 </label>
+                <label class="field signer-upload-field">
+                  <span>上传签名</span>
+                  <input id="signerUpload" type="file" accept="image/*" />
+                </label>
+                <div id="signerUploadState" class="upload-inline-status">未上传</div>
+                <img id="signerUploadPreview" class="signer-upload-preview" alt="乙方签名图片预览" hidden />
                 <div class="signature-pad">
                   <canvas id="signatureCanvas" aria-label="电子手写签名"></canvas>
                 </div>
