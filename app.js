@@ -764,8 +764,16 @@
 
   function renderSignatureBlock(contract, fields) {
     const signature = contract.signature || contract.snapshot?.signature || {};
-    const partyASignature = fields.partyASignature ? `<img src="${escapeAttr(fields.partyASignature)}" alt="甲方签名" />` : "";
-    const partyADate = fields.partyASignDate ? formatDateCn(fields.partyASignDate) : "";
+    const partyASignatureValue = fields.partyASignature
+      || contract.snapshot?.fields?.partyASignature
+      || contract.fields?.partyASignature
+      || "";
+    const partyADateValue = fields.partyASignDate
+      || contract.snapshot?.fields?.partyASignDate
+      || contract.fields?.partyASignDate
+      || "";
+    const partyASignature = partyASignatureValue ? `<img src="${escapeAttr(partyASignatureValue)}" alt="甲方签名" />` : "";
+    const partyADate = partyADateValue ? formatDateCn(partyADateValue) : "";
     const signImage = signature.imageData ? `<img src="${escapeAttr(signature.imageData)}" alt="乙方签名" />` : "";
     const signDate = signature.signedAt ? formatDateCn(signature.signedAt.slice(0, 10)) : "";
     const finalMeta = signature.snapshotHash ? `<div class="final-meta">合同快照：${escapeHtml(signature.snapshotHash)}</div>` : "";
@@ -1392,6 +1400,8 @@
         partyBPhone: rawSnapshotFields.partyBPhone || rawSnapshotFields.phone || fields.partyBPhone,
         retentionDate: rawSnapshotFields.retentionDate || normalizeDateLike(rawSnapshotFields.retentionPeriod) || fields.retentionDate,
         sampleShippingInfo: rawSnapshotFields.sampleShippingInfo || fields.sampleShippingInfo,
+        partyASignDate: rawSnapshotFields.partyASignDate || fields.partyASignDate,
+        partyASignature: rawSnapshotFields.partyASignature || fields.partyASignature,
       },
       clauses: Array.isArray(snapshot.clauses) && snapshot.clauses.length ? snapshot.clauses : clone(DEFAULT_CLAUSES),
       clauseVersion: snapshot.clauseVersion || CLAUSE_SEED_LABEL,
@@ -1511,7 +1521,12 @@
     if (!contract?.signature?.imageData) return;
     contract.snapshot = {
       ...(contract.snapshot || {}),
-      fields: clone(contract.snapshot?.fields || contract.fields),
+      fields: {
+        ...clone(contract.fields),
+        ...(contract.snapshot?.fields || {}),
+        partyASignDate: contract.snapshot?.fields?.partyASignDate || contract.fields.partyASignDate || "",
+        partyASignature: contract.snapshot?.fields?.partyASignature || contract.fields.partyASignature || "",
+      },
       clauses: clone(contract.snapshot?.clauses || activeClauseVersion().sections),
       clauseVersion: contract.snapshot?.clauseVersion || activeClauseVersion().version,
       clauseSeedVersion: contract.snapshot?.clauseSeedVersion || activeClauseVersion().seedVersion || "",
@@ -1772,6 +1787,16 @@
     if (!localContract.fields.partyASignature && payloadContract.fields.partyASignature) {
       localContract.fields.partyASignature = payloadContract.fields.partyASignature;
       changed = true;
+    }
+    if (localContract.snapshot?.fields) {
+      if (!localContract.snapshot.fields.partyASignDate && payloadContract.fields.partyASignDate) {
+        localContract.snapshot.fields.partyASignDate = payloadContract.fields.partyASignDate;
+        changed = true;
+      }
+      if (!localContract.snapshot.fields.partyASignature && payloadContract.fields.partyASignature) {
+        localContract.snapshot.fields.partyASignature = payloadContract.fields.partyASignature;
+        changed = true;
+      }
     }
     if (!localContract.confirmedAt && payloadContract.confirmedAt) {
       localContract.confirmedAt = payloadContract.confirmedAt;
