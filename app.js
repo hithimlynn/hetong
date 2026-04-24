@@ -43,9 +43,7 @@
     partyASignDate: "ad",
     partyASignature: "as",
   };
-  const SHARE_FIELD_KEY_MAP_REVERSE = Object.fromEntries(
-    Object.entries(SHARE_FIELD_KEY_MAP).map(([fieldKey, shortKey]) => [shortKey, fieldKey]),
-  );
+  const SHARE_FIELD_KEY_MAP_REVERSE = buildReverseMap(SHARE_FIELD_KEY_MAP);
 
   const STATUS = {
     draft: { label: "草稿", className: "" },
@@ -200,7 +198,7 @@
     setupSignatureCanvas();
     if (channel) {
       channel.onmessage = (event) => {
-        if (event.data?.from === INSTANCE_ID) return;
+        if (event.data && event.data.from === INSTANCE_ID) return;
         store = loadStore();
         renderAll();
       };
@@ -463,31 +461,31 @@
   }
 
   function handleFormClick(event) {
-    const toggle = event.target.closest("[data-option-toggle]");
+    const toggle = getClosest(event.target, "[data-option-toggle]");
     if (toggle) {
       toggleOptionPanel(toggle.dataset.optionToggle);
       return;
     }
-    const select = event.target.closest("[data-option-select]");
+    const select = getClosest(event.target, "[data-option-select]");
     if (select) {
       selectComboOption(select.dataset.optionSelect, select.dataset.optionValue || "");
       return;
     }
-    const remove = event.target.closest("[data-option-delete]");
+    const remove = getClosest(event.target, "[data-option-delete]");
     if (remove) {
       removeComboOption(remove.dataset.optionDelete, remove.dataset.optionValue || "");
       return;
     }
-    const add = event.target.closest("[data-option-add]");
+    const add = getClosest(event.target, "[data-option-add]");
     if (add) {
       addComboOption(add.dataset.optionAdd);
       return;
     }
-    if (!event.target.closest("[data-option-manager]")) openOptionPanelKey = "";
+    if (!getClosest(event.target, "[data-option-manager]")) openOptionPanelKey = "";
   }
 
   function handleFormKeydown(event) {
-    const optionInput = event.target.closest("[data-option-new]");
+    const optionInput = getClosest(event.target, "[data-option-new]");
     if (!optionInput || event.key !== "Enter") return;
     event.preventDefault();
     addComboOption(optionInput.dataset.optionNew);
@@ -504,7 +502,7 @@
     const field = fieldConfig(fieldKey);
     if (field.type !== "combo" || !field.optionStoreKey) return;
     const input = document.querySelector(`[data-option-new="${fieldKey}"]`);
-    const nextValue = String(input?.value || "").trim();
+    const nextValue = String(input ? input.value : "").trim();
     if (!nextValue) {
       showValidation([`请输入新增${field.label}`]);
       return;
@@ -553,7 +551,7 @@
     if (!contract) return;
     const status = STATUS[contract.status] || STATUS.draft;
     document.getElementById("previewMeta").textContent = `${status.label} · ${contract.fields.brand || "未命名合同"}`;
-    if (document.activeElement?.closest("#contractForm")) return;
+    if (getClosest(document.activeElement, "#contractForm")) return;
     document.getElementById("contractPreview").innerHTML = renderEditableContractDocument(contract);
     setupPartyASignatureCanvas();
     document.getElementById("publishBtn").disabled = contract.status !== "draft";
@@ -586,7 +584,7 @@
       status.textContent = `当前状态：${CONTRACT_TITLE} · ${statusInfo.label}`;
       preview.innerHTML = renderContractDocument(contract);
       meta.textContent = `${CONTRACT_TITLE} · ${statusInfo.label}`;
-      if ((!signerNameInput.value || contract.status === "signed") && contract.signature?.signerName) {
+      if ((!signerNameInput.value || contract.status === "signed") && contract.signature && contract.signature.signerName) {
         signerNameInput.value = contract.signature.signerName;
       }
     }
@@ -631,8 +629,10 @@
   function saveClauseVersion() {
     const blocks = Array.from(document.querySelectorAll(".clause-item"));
     const sections = blocks.map((block, index) => {
-      const title = block.querySelector('[data-clause-field="title"]')?.value.trim() || `条款 ${index + 1}`;
-      const bodyText = block.querySelector('[data-clause-field="body"]')?.value || "";
+      const titleInput = block.querySelector('[data-clause-field="title"]');
+      const bodyInput = block.querySelector('[data-clause-field="body"]');
+      const title = (titleInput ? titleInput.value.trim() : "") || `条款 ${index + 1}`;
+      const bodyText = bodyInput ? bodyInput.value : "";
       const body = bodyText
         .split(/\n+/)
         .map((line) => line.trim())
@@ -656,7 +656,7 @@
 
   function renderTopState() {
     const contract = currentContract();
-    const status = contract ? STATUS[contract.status]?.label || "草稿" : "无合同";
+    const status = contract ? ((STATUS[contract.status] && STATUS[contract.status].label) || "草稿") : "无合同";
     document.getElementById("syncState").textContent = `本地已同步 · ${status}`;
   }
 
@@ -763,14 +763,14 @@
   }
 
   function renderSignatureBlock(contract, fields) {
-    const signature = contract.signature || contract.snapshot?.signature || {};
+    const signature = contract.signature || getIn(contract, ["snapshot", "signature"]) || {};
     const partyASignatureValue = fields.partyASignature
-      || contract.snapshot?.fields?.partyASignature
-      || contract.fields?.partyASignature
+      || getIn(contract, ["snapshot", "fields", "partyASignature"])
+      || getIn(contract, ["fields", "partyASignature"])
       || "";
     const partyADateValue = fields.partyASignDate
-      || contract.snapshot?.fields?.partyASignDate
-      || contract.fields?.partyASignDate
+      || getIn(contract, ["snapshot", "fields", "partyASignDate"])
+      || getIn(contract, ["fields", "partyASignDate"])
       || "";
     const partyASignature = partyASignatureValue ? `<img src="${escapeAttr(partyASignatureValue)}" alt="甲方签名" />` : "";
     const partyADate = partyADateValue ? formatDateCn(partyADateValue) : "";
@@ -804,7 +804,8 @@
     if (!contract || contract.status !== "draft") return;
     if (event.target.dataset.retentionLongTerm === "true") {
       contract.fields[key] = event.target.checked ? "长期" : "";
-      const dateInput = event.target.closest(".retention-control")?.querySelector('input[type="date"]');
+      const retentionControl = getClosest(event.target, ".retention-control");
+      const dateInput = retentionControl ? retentionControl.querySelector('input[type="date"]') : null;
       if (dateInput) dateInput.disabled = event.target.checked;
     } else {
       contract.fields[key] = event.target.value;
@@ -829,7 +830,7 @@
     }
     const contract = currentContract();
     if (!contract || contract.status !== "draft") return;
-    const file = event.target.files?.[0];
+    const file = event.target.files && event.target.files[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       showValidation(["请上传图片格式的甲方签名。"]);
@@ -959,12 +960,12 @@
   }
 
   function selectContractFromList(event) {
-    const deleteButton = event.target.closest("[data-delete-contract-id]");
+    const deleteButton = getClosest(event.target, "[data-delete-contract-id]");
     if (deleteButton) {
       deleteContract(deleteButton.dataset.deleteContractId);
       return;
     }
-    const item = event.target.closest("[data-contract-id]");
+    const item = getClosest(event.target, "[data-contract-id]");
     if (!item) return;
     store.selectedId = item.dataset.contractId;
     activeView = "editor";
@@ -1019,7 +1020,7 @@
   async function copyTextToClipboard(text, sourceInput) {
     if (!text) return false;
     try {
-      if (navigator.clipboard?.writeText && window.isSecureContext) {
+      if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
         await navigator.clipboard.writeText(text);
         return true;
       }
@@ -1063,7 +1064,10 @@
     const status = document.getElementById("signerUploadState");
     const preview = document.getElementById("signerUploadPreview");
     if (!status || !preview) return;
-    const currentImage = signerUploadData || contract?.signature?.imageData || contract?.snapshot?.signature?.imageData || "";
+    const currentImage = signerUploadData
+      || getIn(contract, ["signature", "imageData"])
+      || getIn(contract, ["snapshot", "signature", "imageData"])
+      || "";
     if (currentImage) {
       preview.hidden = false;
       preview.src = currentImage;
@@ -1086,7 +1090,7 @@
 
   function handleSignerUploadChange(event) {
     const contract = signerContract();
-    const file = event.target.files?.[0];
+    const file = event.target.files && event.target.files[0];
     if (!file) {
       resetSignerUpload();
       renderSignerUploadState(contract);
@@ -1222,7 +1226,7 @@
     if (!canvas) return;
     const contract = currentContract();
     const context = canvas.getContext("2d");
-    const canEdit = contract?.status === "draft";
+    const canEdit = contract && contract.status === "draft";
     let drawing = false;
 
     function resize() {
@@ -1236,7 +1240,7 @@
       context.lineJoin = "round";
       context.lineWidth = 2.2;
       context.strokeStyle = "#111";
-      if (contract?.fields.partyASignature) {
+      if (contract && contract.fields && contract.fields.partyASignature) {
         const image = new Image();
         image.onload = () => context.drawImage(image, 0, 0, rect.width, rect.height);
         image.src = contract.fields.partyASignature;
@@ -1277,7 +1281,8 @@
       drawing = false;
     });
 
-    document.getElementById("clearPartyASignBtn")?.addEventListener("click", () => {
+    const clearPartyButton = document.getElementById("clearPartyASignBtn");
+    if (clearPartyButton) clearPartyButton.addEventListener("click", () => {
       if (!contract || contract.status !== "draft") return;
       context.clearRect(0, 0, canvas.width, canvas.height);
       contract.fields.partyASignature = "";
@@ -1287,7 +1292,8 @@
       renderPreview();
     });
 
-    document.getElementById("savePartyASignBtn")?.addEventListener("click", () => {
+    const savePartyButton = document.getElementById("savePartyASignBtn");
+    if (savePartyButton) savePartyButton.addEventListener("click", () => {
       if (!contract || contract.status !== "draft") return;
       contract.fields.partyASignature = compactPartyASignatureDataUrl(canvas);
       contract.updatedAt = nowIso();
@@ -1401,7 +1407,7 @@
       audit: Array.isArray(contract.audit) ? contract.audit : [],
       fields,
       snapshot,
-      signature: contract.signature || snapshot?.signature || null,
+      signature: contract.signature || getIn(snapshot, ["signature"]) || null,
     };
   }
 
@@ -1437,9 +1443,9 @@
   function shouldUpgradeSnapshotClauses(snapshot) {
     if (!snapshot) return false;
     if (snapshot.clauseSeedVersion === CLAUSE_SEED_VERSION) return false;
-    const firstClause = snapshot.clauses?.[0];
-    const firstLine = firstClause?.body?.[0] || "";
-    return firstClause?.title === "三、权利义务" && firstLine.includes("甲方应按约定向乙方提供合作需求");
+    const firstClause = getIn(snapshot, ["clauses", 0]);
+    const firstLine = getIn(firstClause, ["body", 0]) || "";
+    return firstClause && firstClause.title === "三、权利义务" && firstLine.includes("甲方应按约定向乙方提供合作需求");
   }
 
   function normalizeOptions(values, defaults = [], extras = []) {
@@ -1505,8 +1511,8 @@
   }
 
   function formatPlatformLine(fields) {
-    const platform = String(fields?.platform || "").trim();
-    const account = String(fields?.platformAccount || "").trim();
+    const platform = String(fields && fields.platform || "").trim();
+    const account = String(fields && fields.platformAccount || "").trim();
     if (platform && account) return `${platform} / ${account}`;
     return platform || account || "-";
   }
@@ -1536,19 +1542,21 @@
   }
 
   function syncSignedSignature(contract) {
-    if (!contract?.signature?.imageData) return;
+    if (!getIn(contract, ["signature", "imageData"])) return;
+    const snapshotFields = getIn(contract, ["snapshot", "fields"]) || {};
+    const snapshotClauses = getIn(contract, ["snapshot", "clauses"]);
     contract.snapshot = {
       ...(contract.snapshot || {}),
       fields: {
         ...clone(contract.fields),
-        ...(contract.snapshot?.fields || {}),
-        partyASignDate: contract.snapshot?.fields?.partyASignDate || contract.fields.partyASignDate || "",
-        partyASignature: contract.snapshot?.fields?.partyASignature || contract.fields.partyASignature || "",
+        ...snapshotFields,
+        partyASignDate: snapshotFields.partyASignDate || contract.fields.partyASignDate || "",
+        partyASignature: snapshotFields.partyASignature || contract.fields.partyASignature || "",
       },
-      clauses: clone(contract.snapshot?.clauses || activeClauseVersion().sections),
-      clauseVersion: contract.snapshot?.clauseVersion || activeClauseVersion().version,
-      clauseSeedVersion: contract.snapshot?.clauseSeedVersion || activeClauseVersion().seedVersion || "",
-      publishedAt: contract.publishedAt || contract.snapshot?.publishedAt || nowIso(),
+      clauses: clone(snapshotClauses || activeClauseVersion().sections),
+      clauseVersion: getIn(contract, ["snapshot", "clauseVersion"]) || activeClauseVersion().version,
+      clauseSeedVersion: getIn(contract, ["snapshot", "clauseSeedVersion"]) || activeClauseVersion().seedVersion || "",
+      publishedAt: contract.publishedAt || getIn(contract, ["snapshot", "publishedAt"]) || nowIso(),
       signature: clone(contract.signature),
       signedAt: contract.signedAt || contract.signature.signedAt || nowIso(),
     };
@@ -1664,11 +1672,10 @@
 
   function buildSignLink(contract) {
     const payload = encodeSignPayload(contract);
-    const url = new URL(location.href);
-    url.searchParams.set(SIGN_HASH_KEY, contract.token);
-    url.searchParams.set(SIGN_PAYLOAD_KEY, payload);
-    url.hash = "";
-    return url.toString();
+    return `${getUrlBase()}?${buildQueryString({
+      [SIGN_HASH_KEY]: contract.token,
+      [SIGN_PAYLOAD_KEY]: payload,
+    })}`;
   }
 
   function encodeSignPayload(contract) {
@@ -1714,8 +1721,8 @@
           ...(signature ? { signature: clone(signature), signedAt: signature.signedAt || "" } : {}),
         },
         signature,
-        signedAt: signature?.signedAt || "",
-        confirmedAt: signature?.confirmedAt || "",
+        signedAt: signature ? signature.signedAt || "" : "",
+        confirmedAt: signature ? signature.confirmedAt || "" : "",
         audit: [],
         publishedAt,
         createdAt: publishedAt.slice(0, 10),
@@ -1731,11 +1738,11 @@
     const compact = {};
     Object.entries(SHARE_FIELD_KEY_MAP).forEach(([fieldKey, shortKey]) => {
       if (fieldKey === "amountUpper") return;
-      const rawValue = fields?.[fieldKey];
+      const rawValue = fields ? fields[fieldKey] : null;
       if (rawValue == null) return;
       const value = String(rawValue).trim();
       if (!value) return;
-      if (String(DEFAULT_FIELDS[fieldKey] ?? "").trim() === value) return;
+      if (String(DEFAULT_FIELDS[fieldKey] == null ? "" : DEFAULT_FIELDS[fieldKey]).trim() === value) return;
       if (fieldKey === "partyASignature" && value.length > 3200) return;
       compact[shortKey] = value;
     });
@@ -1776,7 +1783,7 @@
   }
 
   function compactSignature(signature) {
-    if (!signature?.imageData) return null;
+    if (!signature || !signature.imageData) return null;
     return {
       n: signature.signerName || "",
       i: signature.imageData,
@@ -1787,7 +1794,7 @@
   }
 
   function expandSignature(signature) {
-    if (!signature?.i) return null;
+    if (!signature || !signature.i) return null;
     return {
       signerName: signature.n || "",
       imageData: signature.i,
@@ -1816,7 +1823,7 @@
       localContract.fields.partyASignature = payloadContract.fields.partyASignature;
       changed = true;
     }
-    if (localContract.snapshot?.fields) {
+    if (getIn(localContract, ["snapshot", "fields"])) {
       if (!localContract.snapshot.fields.partyASignDate && payloadContract.fields.partyASignDate) {
         localContract.snapshot.fields.partyASignDate = payloadContract.fields.partyASignDate;
         changed = true;
@@ -1838,14 +1845,13 @@
   }
 
   function parseSignerParams() {
-    const searchParams = new URLSearchParams(location.search);
+    const searchParams = createParamBag(location.search);
     if (searchParams.get(SIGN_HASH_KEY) || searchParams.get("sign")) return searchParams;
-    const hash = location.hash.startsWith("#") ? location.hash.slice(1) : location.hash;
-    return new URLSearchParams(hash);
+    return createParamBag(location.hash);
   }
 
   function isSignerRoute() {
-    const searchParams = new URLSearchParams(location.search);
+    const searchParams = createParamBag(location.search);
     if (searchParams.get(SIGN_HASH_KEY) || searchParams.get("sign")) return true;
     return location.hash.startsWith(`#${SIGN_HASH_KEY}=`) || location.hash.startsWith("#sign=");
   }
@@ -1935,7 +1941,7 @@
         userAgent: signature.userAgent,
       },
     });
-    if (window.crypto?.subtle && window.TextEncoder) {
+    if (window.crypto && window.crypto.subtle && window.TextEncoder) {
       const bytes = new TextEncoder().encode(payload);
       const digest = await window.crypto.subtle.digest("SHA-256", bytes);
       return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -2041,12 +2047,86 @@
     return `V${match[1]}.${Number(match[2]) + 1}`;
   }
 
+  function buildReverseMap(source) {
+    const target = {};
+    Object.keys(source || {}).forEach((key) => {
+      target[source[key]] = key;
+    });
+    return target;
+  }
+
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
   }
 
+  function getIn(target, path) {
+    let current = target;
+    for (let index = 0; index < path.length; index += 1) {
+      if (current == null) return undefined;
+      current = current[path[index]];
+    }
+    return current;
+  }
+
+  function matchesSelector(element, selector) {
+    if (!element) return false;
+    const matcher = element.matches || element.msMatchesSelector || element.webkitMatchesSelector;
+    return typeof matcher === "function" ? matcher.call(element, selector) : false;
+  }
+
+  function getClosest(element, selector) {
+    if (!element) return null;
+    if (typeof element.closest === "function") return element.closest(selector);
+    let current = element.nodeType === 1 ? element : element.parentElement;
+    while (current) {
+      if (matchesSelector(current, selector)) return current;
+      current = current.parentElement;
+    }
+    return null;
+  }
+
+  function decodeQueryValue(value) {
+    try {
+      return decodeURIComponent(String(value || "").replace(/\+/g, "%20"));
+    } catch (error) {
+      return String(value || "");
+    }
+  }
+
+  function createParamBag(text) {
+    const source = String(text || "").replace(/^[?#]/, "");
+    const map = {};
+    if (source) {
+      source.split("&").forEach((part) => {
+        if (!part) return;
+        const segments = part.split("=");
+        const key = decodeQueryValue(segments.shift());
+        const value = decodeQueryValue(segments.join("="));
+        if (!key) return;
+        map[key] = value;
+      });
+    }
+    return {
+      get(key) {
+        return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : null;
+      },
+    };
+  }
+
+  function buildQueryString(params) {
+    return Object.keys(params || {})
+      .filter((key) => params[key] != null && params[key] !== "")
+      .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(String(params[key]))}`)
+      .join("&");
+  }
+
+  function getUrlBase() {
+    if (location.protocol && location.host) return `${location.protocol}//${location.host}${location.pathname}`;
+    return location.pathname;
+  }
+
   function escapeHtml(value) {
-    return String(value ?? "")
+    return String(value == null ? "" : value)
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
