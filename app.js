@@ -127,6 +127,41 @@
     partyASignature: "",
   };
 
+  const SIGN_LINK_VERSION = 2;
+  const SIGN_HASH_KEY = "s";
+  const SIGN_PAYLOAD_KEY = "p";
+  const SIGN_STATUS_TO_CODE = {
+    draft: "d",
+    published: "p",
+    confirmed: "c",
+    signed: "s",
+    revoked: "r",
+  };
+  const SIGN_CODE_TO_STATUS = {
+    d: "draft",
+    p: "published",
+    c: "confirmed",
+    s: "signed",
+    r: "revoked",
+  };
+  const SHARE_FIELD_KEY_MAP = {
+    brand: "b",
+    platform: "l",
+    platformAccount: "a",
+    creatorName: "n",
+    partyBPhone: "h",
+    sampleShippingInfo: "i",
+    firstReviewDate: "f",
+    finalReviewDate: "g",
+    publishDate: "d",
+    retentionDate: "r",
+    partyAProvided: "m",
+    price: "y",
+    partyASignDate: "x",
+    partyASignature: "q",
+  };
+  const SHARE_FIELD_KEY_MAP_REVERSE = Object.fromEntries(Object.entries(SHARE_FIELD_KEY_MAP).map(([key, value]) => [value, key]));
+
   let store = loadStore();
   let activeView = "editor";
   let signerToken = "";
@@ -172,7 +207,7 @@
     document.querySelectorAll("[data-view]").forEach((button) => {
       button.addEventListener("click", () => {
         activeView = button.dataset.view;
-        if (activeView !== "signer" && location.hash.startsWith("#sign=")) {
+        if (activeView !== "signer" && (location.hash.startsWith("#sign=") || location.hash.startsWith(`#${SIGN_HASH_KEY}=`))) {
           history.replaceState(null, "", location.pathname + location.search);
           signerToken = "";
           signerPayloadContract = null;
@@ -812,7 +847,7 @@
     store.selectedId = item.dataset.contractId;
     activeView = "editor";
     signerToken = "";
-    if (location.hash.startsWith("#sign=")) {
+    if (location.hash.startsWith("#sign=") || location.hash.startsWith(`#${SIGN_HASH_KEY}=`)) {
       history.replaceState(null, "", location.pathname + location.search);
     }
     saveStore(false);
@@ -1391,10 +1426,10 @@
   function parseHashRoute() {
     signerPayloadContract = null;
     const hash = location.hash.slice(1);
-    if (hash.startsWith("sign=")) {
+    if (hash.startsWith(`${SIGN_HASH_KEY}=`) || hash.startsWith("sign=")) {
       const params = new URLSearchParams(hash);
-      signerToken = params.get("sign") || "";
-      signerPayloadContract = decodeSignPayload(params.get("payload"), signerToken);
+      signerToken = params.get(SIGN_HASH_KEY) || params.get("sign") || "";
+      signerPayloadContract = decodeSignPayload(params.get(SIGN_PAYLOAD_KEY) || params.get("payload"), signerToken);
       hydrateSignerPayloadContract();
       activeView = "signer";
     } else if (hash.startsWith("signed=")) {
@@ -1435,20 +1470,15 @@
 
   function buildSignLink(contract) {
     const payload = encodeSignPayload(contract);
-    return `${location.href.split("#")[0]}#sign=${encodeURIComponent(contract.token)}&payload=${encodeURIComponent(payload)}`;
+    return `${location.href.split("#")[0]}#${SIGN_HASH_KEY}=${encodeURIComponent(contract.token)}&${SIGN_PAYLOAD_KEY}=${encodeURIComponent(payload)}`;
   }
 
   function encodeSignPayload(contract) {
     const fields = clone(contract.snapshot?.fields || contract.fields);
     return encodePayload({
-      id: contract.id,
-      token: contract.token,
-      status: contract.status,
-      fields,
-      clauseSeedVersion: CLAUSE_SEED_VERSION,
-      publishedAt: contract.publishedAt || contract.snapshot?.publishedAt || nowIso(),
-      createdAt: contract.createdAt,
-      updatedAt: contract.updatedAt,
+      v: SIGN_LINK_VERSION,
+      s: SIGN_STATUS_TO_CODE[contract.status] || SIGN_STATUS_TO_CODE.published,
+      f: compactShareFields(fields),
     });
   }
 
@@ -1456,7 +1486,28 @@
     if (!payload || !token) return null;
     try {
       const decoded = JSON.parse(decodePayload(payload));
-      if (decoded.token !== token) return null;
+      if (decoded.v === SIGN_LINK_VERSION || decoded.f) {
+        const fields = expandShareFields(decoded.f || {});
+        return normalizeContract({
+          id: randomToken(12),
+          status: SIGN_CODE_TO_STATUS[decoded.s] || "published",
+          token,
+          fields,
+          snapshot: {
+            fields: clone(fields),
+            clauses: clone(DEFAULT_CLAUSES),
+            clauseVersion: CLAUSE_SEED_LABEL,
+            clauseSeedVersion: CLAUSE_SEED_VERSION,
+            publishedAt: nowIso(),
+          },
+          signature: null,
+          audit: [],
+          publishedAt: nowIso(),
+          createdAt: nowIso().slice(0, 10),
+          updatedAt: nowIso(),
+        });
+      }
+      if (decoded.token && decoded.token !== token) return null;
       return normalizeContract({
         id: decoded.id || randomToken(12),
         status: ["published", "confirmed", "signed"].includes(decoded.status) ? decoded.status : "published",
@@ -1503,6 +1554,37 @@
       console.warn("Failed to decode signed payload", error);
       return null;
     }
+  }
+
+  function compactShareFields(fields) {
+    const compact = {};
+    Object.entries(SHARE_FIELD_KEY_MAP).forEach(([fieldKey, shortKey]) => {
+      let value = fields?.[fieldKey];
+      if (fieldKey === "amountUpper") return;
+      if (fieldKey === "partyASignature" && shouldOmitSignatureFromShare(value)) return;
+      if (value == null) return;
+      value = String(value).trim();
+      if (!value) return;
+      if (String(DEFAULT_FIELDS[fieldKey] ?? "").trim() === value) return;
+      compact[shortKey] = value;
+    });
+    return compact;
+  }
+
+  function expandShareFields(compactFields) {
+    const fields = { ...DEFAULT_FIELDS };
+    Object.entries(compactFields || {}).forEach(([shortKey, value]) => {
+      const fieldKey = SHARE_FIELD_KEY_MAP_REVERSE[shortKey];
+      if (!fieldKey) return;
+      fields[fieldKey] = value;
+    });
+    fields.amountUpper = moneyToChinese(fields.price);
+    return fields;
+  }
+
+  function shouldOmitSignatureFromShare(value) {
+    const text = String(value || "").trim();
+    return !text || text.startsWith("data:image/");
   }
 
   function importSignedContract(imported) {
