@@ -320,6 +320,107 @@ textarea:disabled {
   padding: 6px;
 }
 
+.option-manager {
+  display: grid;
+  gap: 8px;
+}
+
+.option-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid #dbe3ee;
+  border-radius: 5px;
+  background: #f6f9fd;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.option-trigger-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.option-trigger-action {
+  flex: 0 0 auto;
+  margin-left: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.option-manager.is-open .option-trigger {
+  border-color: var(--accent);
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.option-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #dbe3ee;
+  border-radius: 6px;
+  background: #fbfcff;
+}
+
+.option-list {
+  display: grid;
+  gap: 6px;
+}
+
+.option-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.option-select,
+.option-delete {
+  min-height: 34px;
+  border-radius: 5px;
+}
+
+.option-select {
+  width: 100%;
+  padding: 0 10px;
+  border: 1px solid #dbe3ee;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.option-select.is-selected {
+  border-color: #b7cbf7;
+  background: #edf4ff;
+  color: #1d4ed8;
+}
+
+.option-delete {
+  padding: 0 10px;
+  border: 1px solid #edc5c5;
+  background: #fff7f7;
+  color: var(--danger);
+  cursor: pointer;
+}
+
+.option-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.option-add-row input {
+  min-width: 0;
+}
+
 .embedded-field input:focus,
 .embedded-field textarea:focus,
 .embedded-field select:focus {
@@ -573,8 +674,9 @@ textarea:disabled {
 }
 
 .party-a-sign-pad {
-  width: min(100%, 320px);
+  width: min(100%, 640px);
   aspect-ratio: 4 / 1;
+  min-height: 120px;
   border: 1px dashed var(--line-strong);
   border-radius: 6px;
   background: #fff;
@@ -1006,9 +1108,25 @@ body.exporting-pdf .contract-page {
     font-size: 15px;
   }
 
+  .option-trigger,
+  .option-select,
+  .option-delete {
+    min-height: 42px;
+    font-size: 15px;
+  }
+
+  .option-item,
+  .option-add-row {
+    grid-template-columns: 1fr;
+  }
+
   .embedded-field textarea {
     min-height: 90px;
     font-size: 15px;
+  }
+
+  .party-a-sign-pad {
+    min-height: 140px;
   }
 
   .signature-grid {

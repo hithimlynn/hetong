@@ -5,6 +5,11 @@
   const SIGN_HASH_KEY = "s";
   const SIGN_PAYLOAD_KEY = "p";
   const SIGN_LINK_VERSION = 1;
+  const CONTRACT_TITLE = "达人内容发布合作协议";
+  const CLAUSE_SEED_VERSION = "wlead-pdf-2026-04-24";
+  const CLAUSE_SEED_LABEL = "PDF基准 V2026.04.24";
+  const DEFAULT_BRAND_OPTIONS = ["Wlead"];
+  const DEFAULT_PLATFORM_OPTIONS = ["小红书", "抖音", "bilibili", "公众号"];
   const INSTANCE_ID = randomToken(8);
   const channel = createChannel();
   const SIGN_STATUS_TO_CODE = {
@@ -23,6 +28,7 @@
   };
   const SHARE_FIELD_KEY_MAP = {
     brand: "b",
+    platform: "pf",
     platformAccount: "pa",
     creatorName: "c",
     partyBPhone: "ph",
@@ -53,9 +59,24 @@
     {
       title: "合作内容",
       fields: [
-        { key: "brand", label: "品牌", required: true },
-        { key: "platformAccount", label: "平台账号", required: true },
+        {
+          key: "brand",
+          label: "品牌",
+          type: "combo",
+          optionStoreKey: "brandOptions",
+          options: DEFAULT_BRAND_OPTIONS,
+          required: true,
+        },
         { key: "creatorName", label: "博主名称", required: true },
+        {
+          key: "platform",
+          label: "平台",
+          type: "combo",
+          optionStoreKey: "platformOptions",
+          options: DEFAULT_PLATFORM_OPTIONS,
+          required: true,
+        },
+        { key: "platformAccount", label: "账号", placeholder: "请输入账号，不进入候选记录" },
         { key: "partyBPhone", label: "乙方联系电话", required: true },
         {
           key: "sampleShippingInfo",
@@ -97,38 +118,51 @@
     {
       title: "三、权利义务",
       body: [
-        "甲方应按约定向乙方提供合作需求、审核意见和必要资料，并保证其提供内容合法合规。",
-        "乙方应按约定完成内容制作、审核修改、发布和保留，不得擅自删除、隐藏或设置为私密。",
-        "乙方应保证交付内容不侵犯第三方合法权益，并对合作过程中知悉的未公开信息承担保密义务。",
+        "1、甲方权利义务",
+        "（1）本次合作内容制作具体要求，甲方应按照约定时间及时以书面形式发送给乙方，并保证各项内容要求符合相关法规，内容制作过程中为更高效完成创作，相应修改应及时总结告知乙方，且修改次数为（两次）",
+        "（2）对本次发布推广的内容，甲方可无偿进行再剪辑，相关内容甲方或甲方关联主体可在抖音、",
+        "（3）甲方对本次合作费用有保密义务,所有达人发布后（14）天结算所有费用",
+        "2、乙方权利义务",
+        "（1）在内容制作完成后乙方应将相关内容成稿以及原素材发送给甲方。",
+        "（2）若甲方内容制作要求有违反国家政策法规，乙方有权拒绝代理发布。",
+        "（3）乙方在内容制作过程中，所提供的策划、拍摄方案应保证不侵犯任何第三方的知识产权。",
+        "（4）乙方应确保其提供的服务内容符合相关法律法规的规定，否则应赔偿甲方因此所遭受的损失，甲方对乙方服务内容的审核并不免除乙方的上述义务。",
+        "（5）乙方应对本协议及服务过程中知悉的甲方信息予以保密，否则应赔偿甲方因此所遭受的损失，本条款在合同履行完毕、解除终止后继续有效，按照下述第 6 条约定",
+        "（6）在本次合作内容发布 3 个月内，乙方未经甲方同意不得对已发布内容进行删改变更。",
+        "（7）若乙方试用产品后 5 日内决定终止合作，可书面告知甲方并寄回产品并结束与甲方的合作。",
+        "（8）如乙方超过 5 日未做书面回复，视为乙方认可甲方产品，乙方须在双方约定时间内完成本次合作",
       ],
     },
     {
       title: "四、违约责任",
       body: [
-        "任一方违反本协议约定，应赔偿守约方因此遭受的实际损失。",
-        "乙方逾期发布或发布内容不符合确认稿的，甲方有权要求限期改正、补发或按比例退款。",
-        "因任一方原因造成第三方索赔的，由责任方自行承担相关责任。",
+        "1、若乙方因自行策划内容出现知识产权侵权引起第三方追索或要求赔偿，由乙方承担责任。",
+        "2、若甲方因定制内容有知识产权侵权引起第三方追索或要求赔偿，由甲方承担责任。",
+        "3、因任何一方原因违约，需按协议费用金额的 10%向对方支付违约金。",
       ],
     },
     {
       title: "五、争议解决",
       body: [
-        "本协议适用中华人民共和国法律。",
-        "因本协议产生的争议，双方应友好协商解决；协商不成的，任一方可向履约方所在地人民法院提起诉讼。",
+        "1、因本协议订立、履行、解释所产生的任何争议适用中华人民共和国法律。",
+        "2、因本协议订立、履行、解释所产生的任何争议首先由双方友好协商解决，协商不能解决的，任何一方均有权向履约方所在地人民法院提起诉讼。",
+        "3、乙方在甲方催告后未按照合同约定提供服务，或提供内容与甲方所提需求不符，由此产生内容发布逾期，每逾期 1 天乙方应承担金额的 10％作为违约金，如超过 3 天的，甲方有权解除合同并要求乙方按照上述第 3 点的约定赔偿违约金修改内容除外",
+        "4、甲方在乙方催告后未按照合同约定进行转账，由此产生支付逾期，每逾期 1 天甲方应承担金额的 10％作为违约金内容未发布除外",
       ],
     },
     {
-      title: "六、协议生效",
+      title: "六、协议的变更及生效",
       body: [
-        "本协议自双方签字或盖章之日起生效。",
-        "本协议发布后绑定当前字段和条款版本快照，后续模板修改不影响已发布合同。",
+        "1、本协议壹式贰份，甲乙双方各持壹份，自双方签字或盖章之日起发生法律效力。",
+        "2、协议中未尽事宜，经双方协商一致，可以签订书面补充协议，补充协议与本协议不一致的，以补充协议为准。本协议部分条款的无效或效力待定不影响其他条款的执行",
       ],
     },
   ];
 
   const DEFAULT_FIELDS = {
     brand: "Wlead",
-    platformAccount: "小红书 / @creator",
+    platform: "小红书",
+    platformAccount: "@creator",
     creatorName: "一只允沫",
     partyBPhone: "13800000000",
     sampleShippingInfo: "未寄样",
@@ -152,6 +186,7 @@
   let signerUploadData = "";
   let signerUploadName = "";
   let signerUploadKey = "";
+  let openOptionPanelKey = "";
   let canvasReady = false;
   let resizeSignatureCanvas = () => {};
 
@@ -220,6 +255,8 @@
     document.getElementById("signerUpload").addEventListener("change", handleSignerUploadChange);
     document.getElementById("contractForm").addEventListener("input", handleFieldInput);
     document.getElementById("contractForm").addEventListener("change", handleFieldChange);
+    document.getElementById("contractForm").addEventListener("click", handleFormClick);
+    document.getElementById("contractForm").addEventListener("keydown", handleFormKeydown);
     document.getElementById("contractForm").addEventListener("submit", (event) => event.preventDefault());
     document.getElementById("contractList").addEventListener("click", selectContractFromList);
     document.getElementById("searchInput").addEventListener("input", renderContractList);
@@ -239,9 +276,9 @@
 
   function renderTabs() {
     document.body.classList.toggle("signer-portal", Boolean(signerToken));
-    document.querySelector(".brand strong").textContent = signerToken ? "合同" : "合同生成系统";
+    document.querySelector(".brand strong").textContent = signerToken ? CONTRACT_TITLE : "合同生成系统";
     if (!document.body.classList.contains("exporting-pdf")) {
-      document.title = signerToken ? "合同" : "合同生成系统";
+      document.title = signerToken ? CONTRACT_TITLE : "合同生成系统";
     }
     document.querySelectorAll("[data-view]").forEach((button) => {
       button.classList.toggle("is-active", button.dataset.view === activeView);
@@ -255,7 +292,14 @@
     const query = document.getElementById("searchInput").value.trim().toLowerCase();
     const list = document.getElementById("contractList");
     const items = store.contracts.filter((contract) => {
-      const text = [contract.fields.brand, contract.fields.creatorName, contract.fields.platformAccount, contract.fields.partyBPhone]
+      const text = [
+        contract.fields.brand,
+        contract.fields.creatorName,
+        contract.fields.platform,
+        contract.fields.platformAccount,
+        formatPlatformLine(contract.fields),
+        contract.fields.partyBPhone,
+      ]
         .join(" ")
         .toLowerCase();
       return !query || text.includes(query);
@@ -269,7 +313,7 @@
             <button class="contract-select-button" type="button" data-contract-id="${escapeAttr(contract.id)}">
               <span class="contract-item-main">
               <strong>${escapeHtml(contract.fields.brand || "未命名合同")}</strong>
-              <span>${escapeHtml(contract.fields.creatorName || "-")} · ${escapeHtml(contract.fields.platformAccount || "-")}</span>
+              <span>${escapeHtml(contract.fields.creatorName || "-")} · ${escapeHtml(formatPlatformLine(contract.fields))}</span>
               <em class="status-pill ${status.className}">${status.label}</em>
               </span>
             </button>
@@ -313,6 +357,50 @@
   function renderFieldControl(contract, field, locked) {
     const value = contract.fields[field.key] || "";
     const disabled = locked || field.readonly ? "disabled" : "";
+    if (field.type === "combo") {
+      const options = getComboOptions(field);
+      const isOpen = openOptionPanelKey === field.key;
+      return `
+        <div class="option-manager${isOpen ? " is-open" : ""}" data-option-manager="${field.key}">
+          <button class="option-trigger" type="button" data-option-toggle="${field.key}" ${disabled}>
+            <span class="option-trigger-value">${escapeHtml(value || `请选择${field.label}`)}</span>
+            <span class="option-trigger-action">${isOpen ? "收起" : "展开"}</span>
+          </button>
+          <div class="option-panel"${isOpen ? "" : " hidden"}>
+            <div class="option-list">
+              ${options.map((option) => `
+                <div class="option-item">
+                  <button
+                    class="option-select${String(option) === String(value) ? " is-selected" : ""}"
+                    type="button"
+                    data-option-select="${field.key}"
+                    data-option-value="${escapeAttr(option)}"
+                    ${disabled}
+                  >${escapeHtml(option)}</button>
+                  <button
+                    class="option-delete"
+                    type="button"
+                    data-option-delete="${field.key}"
+                    data-option-value="${escapeAttr(option)}"
+                    ${disabled}
+                  >删除</button>
+                </div>
+              `).join("")}
+            </div>
+            <div class="option-add-row">
+              <input
+                data-option-new="${field.key}"
+                type="text"
+                value=""
+                placeholder="新增${escapeAttr(field.label)}"
+                ${disabled}
+              />
+              <button class="ghost-button" type="button" data-option-add="${field.key}" ${disabled}>新增</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
     if (field.type === "file") {
       const preview = value ? `<img class="upload-preview" src="${escapeAttr(value)}" alt="甲方签名预览" />` : `<em class="upload-empty">未上传</em>`;
       return `
@@ -359,8 +447,105 @@
       `;
     }
     return `
-      <input data-field-key="${field.key}" type="${field.type || "text"}" value="${escapeAttr(value)}" ${disabled} />
+      <input
+        data-field-key="${field.key}"
+        type="${field.type || "text"}"
+        value="${escapeAttr(value)}"
+        placeholder="${escapeAttr(field.placeholder || "")}"
+        ${disabled}
+      />
     `;
+  }
+
+  function getComboOptions(field) {
+    if (!field.optionStoreKey) return normalizeOptions([], field.options || []);
+    return normalizeOptions(store[field.optionStoreKey], []);
+  }
+
+  function handleFormClick(event) {
+    const toggle = event.target.closest("[data-option-toggle]");
+    if (toggle) {
+      toggleOptionPanel(toggle.dataset.optionToggle);
+      return;
+    }
+    const select = event.target.closest("[data-option-select]");
+    if (select) {
+      selectComboOption(select.dataset.optionSelect, select.dataset.optionValue || "");
+      return;
+    }
+    const remove = event.target.closest("[data-option-delete]");
+    if (remove) {
+      removeComboOption(remove.dataset.optionDelete, remove.dataset.optionValue || "");
+      return;
+    }
+    const add = event.target.closest("[data-option-add]");
+    if (add) {
+      addComboOption(add.dataset.optionAdd);
+      return;
+    }
+    if (!event.target.closest("[data-option-manager]")) openOptionPanelKey = "";
+  }
+
+  function handleFormKeydown(event) {
+    const optionInput = event.target.closest("[data-option-new]");
+    if (!optionInput || event.key !== "Enter") return;
+    event.preventDefault();
+    addComboOption(optionInput.dataset.optionNew);
+  }
+
+  function toggleOptionPanel(fieldKey) {
+    const contract = currentContract();
+    if (!contract || contract.status !== "draft") return;
+    openOptionPanelKey = openOptionPanelKey === fieldKey ? "" : fieldKey;
+    renderForm();
+  }
+
+  function addComboOption(fieldKey) {
+    const field = fieldConfig(fieldKey);
+    if (field.type !== "combo" || !field.optionStoreKey) return;
+    const input = document.querySelector(`[data-option-new="${fieldKey}"]`);
+    const nextValue = String(input?.value || "").trim();
+    if (!nextValue) {
+      showValidation([`请输入新增${field.label}`]);
+      return;
+    }
+    const contract = currentContract();
+    if (!contract || contract.status !== "draft") return;
+    store[field.optionStoreKey] = normalizeOptions(store[field.optionStoreKey], [], [nextValue]);
+    contract.fields[fieldKey] = nextValue;
+    contract.updatedAt = nowIso();
+    openOptionPanelKey = "";
+    saveStore(true);
+    showValidation([]);
+    renderAll();
+  }
+
+  function removeComboOption(fieldKey, value) {
+    const field = fieldConfig(fieldKey);
+    if (field.type !== "combo" || !field.optionStoreKey) return;
+    const targetValue = String(value || "").trim();
+    if (!targetValue) return;
+    store[field.optionStoreKey] = normalizeOptions(store[field.optionStoreKey], [])
+      .filter((option) => option.toLowerCase() !== targetValue.toLowerCase());
+    saveStore(true);
+    renderForm();
+  }
+
+  function selectComboOption(fieldKey, value) {
+    const contract = currentContract();
+    if (!contract || contract.status !== "draft") return;
+    const field = fieldConfig(fieldKey);
+    const nextValue = String(value || "").trim();
+    if (!nextValue) return;
+    if (field.type === "combo" && field.optionStoreKey) {
+      store[field.optionStoreKey] = normalizeOptions(store[field.optionStoreKey], [], [nextValue]);
+    }
+    contract.fields[fieldKey] = nextValue;
+    contract.updatedAt = nowIso();
+    openOptionPanelKey = "";
+    saveStore(true);
+    showValidation([]);
+    renderAll();
   }
 
   function renderPreview() {
@@ -394,13 +579,13 @@
     if (!contract) {
       status.textContent = signerLinkWarning || "暂无可签署合同。请先由甲方发布合同，或打开乙方签署链接。";
       preview.innerHTML = "";
-      meta.textContent = "待发布";
+      meta.textContent = `${CONTRACT_TITLE} · 待发布`;
       signerNameInput.value = "";
     } else {
       const statusInfo = STATUS[contract.status] || STATUS.draft;
-      status.textContent = `当前状态：${statusInfo.label}`;
+      status.textContent = `当前状态：${CONTRACT_TITLE} · ${statusInfo.label}`;
       preview.innerHTML = renderContractDocument(contract);
-      meta.textContent = `${statusInfo.label} · ${contract.fields.brand || "未命名合同"}`;
+      meta.textContent = `${CONTRACT_TITLE} · ${statusInfo.label}`;
       if ((!signerNameInput.value || contract.status === "signed") && contract.signature?.signerName) {
         signerNameInput.value = contract.signature.signerName;
       }
@@ -483,12 +668,13 @@
     return `
       <article class="contract-document editable-contract">
         <section class="contract-page">
-          <h1 class="doc-title">达人内容发布合作协议</h1>
+          <h1 class="doc-title">${CONTRACT_TITLE}</h1>
           <section class="editable-block">
             <h3>一、合作内容</h3>
             <div class="embedded-grid two-col">
               ${editable("brand")}
               ${editable("creatorName")}
+              ${editable("platform")}
               ${editable("platformAccount")}
               ${editable("partyBPhone")}
               ${editable("sampleShippingInfo")}
@@ -542,12 +728,12 @@
     return `
       <article class="contract-document">
         <section class="contract-page">
-          <h1 class="doc-title">达人内容发布合作协议</h1>
+          <h1 class="doc-title">${CONTRACT_TITLE}</h1>
           <section class="doc-section">
             <h3>一、合作内容</h3>
             <table class="info-table">
               <tr><th>品牌</th><td>${escapeHtml(fields.brand || "-")}</td><th>博主名称</th><td>${escapeHtml(fields.creatorName || "-")}</td></tr>
-              <tr><th>平台账号</th><td colspan="3">${escapeHtml(fields.platformAccount || "-")}</td></tr>
+              <tr><th>平台</th><td>${escapeHtml(fields.platform || "-")}</td><th>账号</th><td>${escapeHtml(fields.platformAccount || "-")}</td></tr>
               <tr><th>联系电话</th><td>${escapeHtml(fields.partyBPhone || "-")}</td><th>寄样信息</th><td>${escapeHtml(fields.sampleShippingInfo || "-")}</td></tr>
               <tr><th>初稿时间</th><td>${escapeHtml(formatDateCn(fields.firstReviewDate || fields.reviewDate) || "-")}</td><th>终稿时间</th><td>${escapeHtml(formatDateCn(fields.finalReviewDate || fields.reviewDate) || "-")}</td></tr>
               <tr><th>发布时间</th><td>${escapeHtml(formatDateCn(fields.publishDate) || "-")}</td><th>保留时间</th><td>${escapeHtml(formatRetentionDate(fields.retentionDate || fields.retentionPeriod) || "-")}</td></tr>
@@ -659,6 +845,7 @@
     store.contracts.unshift(contract);
     store.selectedId = contract.id;
     activeView = "editor";
+    document.getElementById("searchInput").value = "";
     saveStore(true);
     renderAll();
   }
@@ -688,6 +875,7 @@
       fields: clone(contract.fields),
       clauses: clone(activeClauseVersion().sections),
       clauseVersion: activeClauseVersion().version,
+      clauseSeedVersion: activeClauseVersion().seedVersion || "",
       publishedAt: contract.publishedAt,
     };
     contract.audit.push(makeAudit("发布合同", "生成乙方签署链接并锁定合同快照"));
@@ -1124,12 +1312,31 @@
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed.contracts) && parsed.contracts.length) {
           parsed.contracts = parsed.contracts.map(normalizeContract);
+          parsed.brandOptions = normalizeOptions(
+            parsed.brandOptions,
+            Array.isArray(parsed.brandOptions) ? [] : DEFAULT_BRAND_OPTIONS,
+            Array.isArray(parsed.brandOptions) ? [] : parsed.contracts.map((contract) => contract.fields.brand),
+          );
+          parsed.platformOptions = normalizeOptions(
+            parsed.platformOptions,
+            Array.isArray(parsed.platformOptions) ? [] : DEFAULT_PLATFORM_OPTIONS,
+            Array.isArray(parsed.platformOptions) ? [] : parsed.contracts.map((contract) => contract.fields.platform),
+          );
           parsed.clauseVersions = normalizeClauseVersions(parsed.clauseVersions);
-          parsed.activeClauseVersionId = parsed.clauseVersions.some((version) => version.id === parsed.activeClauseVersionId)
-            ? parsed.activeClauseVersionId
-            : parsed.clauseVersions[parsed.clauseVersions.length - 1].id;
+          const seededVersion = parsed.clauseVersions.find((version) => version.seedVersion === CLAUSE_SEED_VERSION);
+          if (seededVersion && parsed.lastAppliedClauseSeed !== CLAUSE_SEED_VERSION) {
+            parsed.activeClauseVersionId = seededVersion.id;
+            parsed.lastAppliedClauseSeed = CLAUSE_SEED_VERSION;
+          } else {
+            parsed.activeClauseVersionId = parsed.clauseVersions.some((version) => version.id === parsed.activeClauseVersionId)
+              ? parsed.activeClauseVersionId
+              : parsed.clauseVersions[parsed.clauseVersions.length - 1].id;
+          }
           if (!parsed.contracts.some((contract) => contract.id === parsed.selectedId)) {
             parsed.selectedId = parsed.contracts[0].id;
+          }
+          if (!parsed.lastAppliedClauseSeed) {
+            parsed.lastAppliedClauseSeed = CLAUSE_SEED_VERSION;
           }
           return parsed;
         }
@@ -1139,11 +1346,21 @@
     }
     const contract = makeContract();
     const clauseVersions = seedClauseVersions();
-    return { selectedId: contract.id, contracts: [contract], clauseVersions, activeClauseVersionId: clauseVersions[0].id };
+    return {
+      selectedId: contract.id,
+      contracts: [contract],
+      brandOptions: normalizeOptions([], DEFAULT_BRAND_OPTIONS, [contract.fields.brand]),
+      platformOptions: normalizeOptions([], DEFAULT_PLATFORM_OPTIONS, [contract.fields.platform]),
+      clauseVersions,
+      activeClauseVersionId: clauseVersions[0].id,
+      lastAppliedClauseSeed: CLAUSE_SEED_VERSION,
+    };
   }
 
   function normalizeContract(contract) {
-    const fields = { ...DEFAULT_FIELDS, ...(contract.fields || {}) };
+    const rawFields = contract.fields || {};
+    const fields = { ...DEFAULT_FIELDS, ...rawFields };
+    normalizePlatformFields(fields, rawFields);
     if (!fields.firstReviewDate && fields.reviewDate) fields.firstReviewDate = fields.reviewDate;
     if (!fields.finalReviewDate && fields.reviewDate) fields.finalReviewDate = fields.reviewDate;
     if (!fields.partyBPhone && fields.phone) fields.partyBPhone = fields.phone;
@@ -1151,20 +1368,7 @@
     if (!fields.sampleShippingInfo) fields.sampleShippingInfo = DEFAULT_FIELDS.sampleShippingInfo;
     if (fields.sampleShippingInfo === "寄样") fields.sampleShippingInfo = "已寄样";
     if (fields.sampleShippingInfo === "不寄样" || fields.sampleShippingInfo === "待确认") fields.sampleShippingInfo = "未寄样";
-    const snapshot = contract.snapshot
-      ? {
-          ...contract.snapshot,
-          fields: {
-            ...DEFAULT_FIELDS,
-            ...(contract.snapshot.fields || fields),
-            firstReviewDate: contract.snapshot.fields?.firstReviewDate || contract.snapshot.fields?.reviewDate || fields.firstReviewDate,
-            finalReviewDate: contract.snapshot.fields?.finalReviewDate || contract.snapshot.fields?.reviewDate || fields.finalReviewDate,
-            partyBPhone: contract.snapshot.fields?.partyBPhone || contract.snapshot.fields?.phone || fields.partyBPhone,
-            retentionDate: contract.snapshot.fields?.retentionDate || normalizeDateLike(contract.snapshot.fields?.retentionPeriod) || fields.retentionDate,
-            sampleShippingInfo: contract.snapshot.fields?.sampleShippingInfo || fields.sampleShippingInfo,
-          },
-        }
-      : null;
+    const snapshot = normalizeSnapshot(contract.snapshot, fields);
     return {
       ...contract,
       token: contract.token || randomToken(18),
@@ -1173,6 +1377,110 @@
       snapshot,
       signature: contract.signature || snapshot?.signature || null,
     };
+  }
+
+  function normalizeSnapshot(snapshot, fields) {
+    if (!snapshot) return null;
+    const rawSnapshotFields = snapshot.fields || fields;
+    const normalized = {
+      ...snapshot,
+      fields: {
+        ...DEFAULT_FIELDS,
+        ...rawSnapshotFields,
+        firstReviewDate: rawSnapshotFields.firstReviewDate || rawSnapshotFields.reviewDate || fields.firstReviewDate,
+        finalReviewDate: rawSnapshotFields.finalReviewDate || rawSnapshotFields.reviewDate || fields.finalReviewDate,
+        partyBPhone: rawSnapshotFields.partyBPhone || rawSnapshotFields.phone || fields.partyBPhone,
+        retentionDate: rawSnapshotFields.retentionDate || normalizeDateLike(rawSnapshotFields.retentionPeriod) || fields.retentionDate,
+        sampleShippingInfo: rawSnapshotFields.sampleShippingInfo || fields.sampleShippingInfo,
+      },
+      clauses: Array.isArray(snapshot.clauses) && snapshot.clauses.length ? snapshot.clauses : clone(DEFAULT_CLAUSES),
+      clauseVersion: snapshot.clauseVersion || CLAUSE_SEED_LABEL,
+      clauseSeedVersion: snapshot.clauseSeedVersion || "",
+    };
+    normalizePlatformFields(normalized.fields, rawSnapshotFields);
+    if (shouldUpgradeSnapshotClauses(normalized)) {
+      normalized.clauses = clone(DEFAULT_CLAUSES);
+      normalized.clauseVersion = CLAUSE_SEED_LABEL;
+      normalized.clauseSeedVersion = CLAUSE_SEED_VERSION;
+    }
+    return normalized;
+  }
+
+  function shouldUpgradeSnapshotClauses(snapshot) {
+    if (!snapshot) return false;
+    if (snapshot.clauseSeedVersion === CLAUSE_SEED_VERSION) return false;
+    const firstClause = snapshot.clauses?.[0];
+    const firstLine = firstClause?.body?.[0] || "";
+    return firstClause?.title === "三、权利义务" && firstLine.includes("甲方应按约定向乙方提供合作需求");
+  }
+
+  function normalizeOptions(values, defaults = [], extras = []) {
+    const seen = new Set();
+    return [...defaults, ...(Array.isArray(values) ? values : []), ...(Array.isArray(extras) ? extras : [])]
+      .map((value) => String(value || "").trim())
+      .filter((value) => {
+        const key = value.toLowerCase();
+        if (!value || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }
+
+  function normalizePlatformFields(fields, rawFields = {}) {
+    const explicitPlatform = String(rawFields.platform || fields.platform || "").trim();
+    const rawAccountValue = rawFields.platformAccount;
+    if (String(rawFields.platform || "").trim()) {
+      fields.platform = explicitPlatform || DEFAULT_FIELDS.platform;
+      fields.platformAccount = String(rawFields.platformAccount || "").trim();
+      return;
+    }
+    if (rawAccountValue == null) {
+      fields.platform = explicitPlatform || DEFAULT_FIELDS.platform;
+      fields.platformAccount = String(fields.platformAccount || "").trim();
+      return;
+    }
+    const split = splitPlatformAccount(rawAccountValue);
+    if (split.account) {
+      fields.platform = split.platform || explicitPlatform || DEFAULT_FIELDS.platform;
+      fields.platformAccount = split.account;
+      return;
+    }
+    const rawText = String(rawAccountValue || "").trim();
+    const knownPlatform = DEFAULT_PLATFORM_OPTIONS.some((option) => option.toLowerCase() === split.platform.toLowerCase());
+    if (knownPlatform) {
+      fields.platform = split.platform || explicitPlatform || DEFAULT_FIELDS.platform;
+      fields.platformAccount = "";
+      return;
+    }
+    fields.platform = explicitPlatform || DEFAULT_FIELDS.platform;
+    fields.platformAccount = rawText;
+  }
+
+  function splitPlatformAccount(value) {
+    const text = String(value || "").trim();
+    if (!text) return { platform: "", account: "" };
+    const parts = text.split(/\s*(?:\/|｜|\||,|，)\s*/).filter(Boolean);
+    if (parts.length > 1) {
+      return { platform: parts[0].trim(), account: parts.slice(1).join(" / ").trim() };
+    }
+    const known = DEFAULT_PLATFORM_OPTIONS.find((option) => option.toLowerCase() === text.toLowerCase());
+    if (known) return { platform: known, account: "" };
+    const prefix = DEFAULT_PLATFORM_OPTIONS.find((option) => text.toLowerCase().startsWith(option.toLowerCase()));
+    if (prefix && text.length > prefix.length) {
+      return {
+        platform: prefix,
+        account: text.slice(prefix.length).replace(/^[\s:：/｜|,，-]+/, "").trim(),
+      };
+    }
+    if (/^@/.test(text)) return { platform: "", account: text };
+    return { platform: text, account: "" };
+  }
+
+  function formatPlatformLine(fields) {
+    const platform = String(fields?.platform || "").trim();
+    const account = String(fields?.platformAccount || "").trim();
+    if (platform && account) return `${platform} / ${account}`;
+    return platform || account || "-";
   }
 
   function saveStore(announce) {
@@ -1206,6 +1514,7 @@
       fields: clone(contract.snapshot?.fields || contract.fields),
       clauses: clone(contract.snapshot?.clauses || activeClauseVersion().sections),
       clauseVersion: contract.snapshot?.clauseVersion || activeClauseVersion().version,
+      clauseSeedVersion: contract.snapshot?.clauseSeedVersion || activeClauseVersion().seedVersion || "",
       publishedAt: contract.publishedAt || contract.snapshot?.publishedAt || nowIso(),
       signature: clone(contract.signature),
       signedAt: contract.signedAt || contract.signature.signedAt || nowIso(),
@@ -1251,10 +1560,11 @@
   function seedClauseVersions() {
     return [
       {
-        id: "clause-v1",
-        version: "V1.0",
+        id: `clause-${CLAUSE_SEED_VERSION}`,
+        version: CLAUSE_SEED_LABEL,
         maintainer: "甲方",
         updatedAt: nowIso(),
+        seedVersion: CLAUSE_SEED_VERSION,
         sections: clone(DEFAULT_CLAUSES),
       },
     ];
@@ -1262,13 +1572,18 @@
 
   function normalizeClauseVersions(versions) {
     if (!Array.isArray(versions) || !versions.length) return seedClauseVersions();
-    return versions.map((version, index) => ({
+    const normalized = versions.map((version, index) => ({
       id: version.id || `clause-v${index + 1}`,
       version: version.version || `V1.${index}`,
       maintainer: version.maintainer || "甲方",
       updatedAt: version.updatedAt || nowIso(),
+      seedVersion: version.seedVersion || "",
       sections: Array.isArray(version.sections) && version.sections.length ? version.sections : clone(DEFAULT_CLAUSES),
     }));
+    if (!normalized.some((version) => version.seedVersion === CLAUSE_SEED_VERSION)) {
+      normalized.push(seedClauseVersions()[0]);
+    }
+    return normalized;
   }
 
   function parseHashRoute() {
@@ -1325,6 +1640,7 @@
       fields: clone(contract.fields),
       clauses: clone(activeClauseVersion().sections),
       clauseVersion: activeClauseVersion().version,
+      clauseSeedVersion: activeClauseVersion().seedVersion || "",
       publishedAt: contract.publishedAt || nowIso(),
     };
     return encodePayload({
@@ -1333,6 +1649,7 @@
       f: compactShareFields(snapshot.fields || contract.fields),
       cl: compactClauses(snapshot.clauses || []),
       cv: snapshot.clauseVersion || activeClauseVersion().version,
+      cs: snapshot.clauseSeedVersion || activeClauseVersion().seedVersion || "",
       pb: snapshot.publishedAt || contract.publishedAt || nowIso(),
       sg: compactSignature(contract.signature || snapshot.signature || null),
     });
@@ -1355,6 +1672,7 @@
           fields: clone(fields),
           clauses,
           clauseVersion: decoded.cv || activeClauseVersion().version,
+          clauseSeedVersion: decoded.cs || "",
           publishedAt,
           ...(signature ? { signature: clone(signature), signedAt: signature.signedAt || "" } : {}),
         },
@@ -1387,12 +1705,14 @@
   }
 
   function expandShareFields(compactFields) {
-    const fields = { ...DEFAULT_FIELDS };
+    const rawFields = {};
     Object.entries(compactFields || {}).forEach(([shortKey, value]) => {
       const fieldKey = SHARE_FIELD_KEY_MAP_REVERSE[shortKey];
       if (!fieldKey) return;
-      fields[fieldKey] = value;
+      rawFields[fieldKey] = value;
     });
+    const fields = { ...DEFAULT_FIELDS, ...rawFields };
+    normalizePlatformFields(fields, rawFields);
     fields.amountUpper = moneyToChinese(fields.price);
     return fields;
   }
