@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260425-supabase-live";
+  const BUILD_TAG = "20260425-signer-fix";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -13,6 +13,7 @@
   const WORKSPACE_TABLE = "workspace_state";
   const REMOTE_SYNC_DEBOUNCE_MS = 900;
   const REMOTE_POLL_INTERVAL_MS = 4000;
+  const REMOTE_REQUEST_TIMEOUT_MS = 8000;
   const CONTRACT_TITLE = "达人内容发布合作协议";
   const CLAUSE_SEED_VERSION = "wlead-pdf-2026-04-24";
   const CLAUSE_SEED_LABEL = "PDF基准 V2026.04.24";
@@ -226,8 +227,8 @@
     parseHashRoute();
     await initializeSupabaseSession();
     applyAuthGate();
-    renderAll();
     setupSignatureCanvas();
+    renderAll();
     if (signerWorkspaceId && signerToken) {
       loadSignerContractFromCloud();
     } else if (isAdminCloudReady()) {
@@ -798,7 +799,7 @@
   }
 
   function renderContractDocument(contract) {
-    const fields = renderFields(contract);
+    const fields = renderFields(contract) || getIn(contract, ["fields"]) || {};
     const clauses = renderClausesForContract(contract);
     return `
       <article class="contract-document">
@@ -839,13 +840,13 @@
 
   function renderSignatureBlock(contract, fields) {
     const signature = contract.signature || getIn(contract, ["snapshot", "signature"]) || {};
-    const partyASignatureValue = fields.partyASignature
-      || getIn(contract, ["snapshot", "fields", "partyASignature"])
+    const partyASignatureValue = getIn(contract, ["snapshot", "fields", "partyASignature"])
       || getIn(contract, ["fields", "partyASignature"])
+      || fields.partyASignature
       || "";
-    const partyADateValue = fields.partyASignDate
-      || getIn(contract, ["snapshot", "fields", "partyASignDate"])
+    const partyADateValue = getIn(contract, ["snapshot", "fields", "partyASignDate"])
       || getIn(contract, ["fields", "partyASignDate"])
+      || fields.partyASignDate
       || "";
     const partyASignature = partyASignatureValue ? `<img src="${escapeAttr(partyASignatureValue)}" alt="甲方签名" />` : "";
     const partyADate = partyADateValue ? formatDateCn(partyADateValue) : "";
@@ -952,7 +953,11 @@
 
   async function publishContract() {
     const contract = currentContract();
-    if (!contract || contract.status !== "draft") return;
+    const status = contract ? String(contract.status || "").trim().toLowerCase() : "";
+    if (!contract || status !== "draft") {
+      showValidation(["当前合同状态不可发布，请选择草稿合同后重试。"]);
+      return;
+    }
     const errors = validateContract(contract);
     if (errors.length) {
       showValidation(errors);
@@ -971,10 +976,14 @@
     };
     contract.audit.push(makeAudit("发布合同", "生成乙方签署链接并锁定合同快照"));
     saveStore(true, { reason: "publish-contract", immediate: true });
-    if (isAdminCloudReady()) {
-      await flushRemoteStore("publish-contract");
-    }
     showValidation([]);
+    renderAll();
+    if (isAdminCloudReady()) {
+      const synced = await flushRemoteStore("publish-contract");
+      if (!synced) {
+        showValidation(["Cloud sync failed after publish. Please retry before sending the signer link."]);
+      }
+    }
     renderAll();
   }
 
@@ -1264,12 +1273,16 @@
 
   function setupSignatureCanvas() {
     const canvas = document.getElementById("signatureCanvas");
+    if (!canvas) return;
     const context = canvas.getContext("2d");
     let drawing = false;
 
     function resize() {
       const rect = canvas.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
+      if (!rect.width || !rect.height) {
+        setTimeout(resize, 100);
+        return;
+      }
       const ratio = window.devicePixelRatio || 1;
       const previous = signatureDirty ? canvas.toDataURL("image/png") : "";
       canvas.width = Math.max(1, Math.floor(rect.width * ratio));
@@ -1327,6 +1340,7 @@
     window.addEventListener("resize", resize);
     resizeSignatureCanvas = resize;
     setTimeout(resize, 0);
+    window.addEventListener("orientationchange", () => setTimeout(resize, 100));
   }
 
   function setupPartyASignatureCanvas() {
@@ -1348,10 +1362,11 @@
       context.lineJoin = "round";
       context.lineWidth = 2.2;
       context.strokeStyle = "#111";
-      if (contract && contract.fields && contract.fields.partyASignature) {
+      const partyASignature = getIn(contract, ["fields", "partyASignature"]) || getIn(contract, ["snapshot", "fields", "partyASignature"]);
+      if (contract && partyASignature) {
         const image = new Image();
         image.onload = () => context.drawImage(image, 0, 0, rect.width, rect.height);
-        image.src = contract.fields.partyASignature;
+        image.src = partyASignature;
       }
     }
 
@@ -1479,12 +1494,12 @@
       brandOptions: normalizeOptions(
         parsed.brandOptions,
         Array.isArray(parsed.brandOptions) ? [] : DEFAULT_BRAND_OPTIONS,
-        Array.isArray(parsed.brandOptions) ? [] : parsed.contracts.map((contract) => getIn(contract, ["fields", "brand"])),
+        Array.isArray(parsed.brandOptions) ? parsed.contracts.map((contract) => getIn(contract, ["fields", "brand"])) : parsed.contracts.map((contract) => getIn(contract, ["fields", "brand"])),
       ),
       platformOptions: normalizeOptions(
         parsed.platformOptions,
         Array.isArray(parsed.platformOptions) ? [] : DEFAULT_PLATFORM_OPTIONS,
-        Array.isArray(parsed.platformOptions) ? [] : parsed.contracts.map((contract) => getIn(contract, ["fields", "platform"])),
+        Array.isArray(parsed.platformOptions) ? parsed.contracts.map((contract) => getIn(contract, ["fields", "platform"])) : parsed.contracts.map((contract) => getIn(contract, ["fields", "platform"])),
       ),
       clauseVersions: normalizeClauseVersions(parsed.clauseVersions),
       activeClauseVersionId: parsed.activeClauseVersionId || "",
@@ -1518,8 +1533,10 @@
     if (fields.sampleShippingInfo === "寄样") fields.sampleShippingInfo = "已寄样";
     if (fields.sampleShippingInfo === "不寄样" || fields.sampleShippingInfo === "待确认") fields.sampleShippingInfo = "未寄样";
     const snapshot = normalizeSnapshot(contract.snapshot, fields);
+    const status = String(contract.status || "draft").trim().toLowerCase();
     return {
       ...contract,
+      status: STATUS[status] ? status : "draft",
       token: contract.token || randomToken(18),
       signWriteToken: contract.signWriteToken || randomToken(24),
       audit: Array.isArray(contract.audit) ? contract.audit : [],
@@ -2088,29 +2105,37 @@
   }
 
   async function fetchRemoteWorkspaceState() {
-    const { data, error } = await supabaseClient
-      .from(WORKSPACE_TABLE)
-      .select("workspace_id,payload,updated_at")
-      .eq("workspace_id", supabaseConfig.workspaceId)
-      .maybeSingle();
+    const { data, error } = await withTimeout(
+      supabaseClient
+        .from(WORKSPACE_TABLE)
+        .select("workspace_id,payload,updated_at")
+        .eq("workspace_id", supabaseConfig.workspaceId)
+        .maybeSingle(),
+      REMOTE_REQUEST_TIMEOUT_MS,
+      "Cloud workspace read timed out. Please check the network connection.",
+    );
     if (error) throw error;
     return data || null;
   }
 
   async function upsertRemoteWorkspaceState(nextStore, reason) {
     const payload = normalizeStoreState(clone(nextStore));
-    const { error } = await supabaseClient
-      .from(WORKSPACE_TABLE)
-      .upsert(
-        {
-          workspace_id: supabaseConfig.workspaceId,
-          owner_id: adminUser.id,
-          payload,
-        },
-        { onConflict: "workspace_id" },
-      )
-      .select("workspace_id")
-      .single();
+    const { error } = await withTimeout(
+      supabaseClient
+        .from(WORKSPACE_TABLE)
+        .upsert(
+          {
+            workspace_id: supabaseConfig.workspaceId,
+            owner_id: adminUser.id,
+            payload,
+          },
+          { onConflict: "workspace_id" },
+        )
+        .select("workspace_id")
+        .single(),
+      REMOTE_REQUEST_TIMEOUT_MS,
+      "Cloud workspace save timed out. Please try again.",
+    );
     if (error) throw error;
     return reason;
   }
@@ -2133,8 +2158,11 @@
     signerRemoteLoading = true;
     signerLinkWarning = "正在加载线上合同...";
     renderAll();
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("线上合同加载超时，请检查网络连接。")), 8000)
+    );
     try {
-      const remoteContract = await fetchSignerContractFromCloud();
+      const remoteContract = await Promise.race([fetchSignerContractFromCloud(), timeoutPromise]);
       signerPayloadContract = normalizeContract(remoteContract);
       signerLinkWarning = "";
       signerRemoteLoading = false;
@@ -2143,7 +2171,7 @@
     } catch (error) {
       signerPayloadContract = null;
       signerRemoteLoading = false;
-      signerLinkWarning = friendlyCloudError(error, "线上合同读取失败，请让甲方重新发布链接。");
+      signerLinkWarning = friendlyCloudError(error, "线上合同加载失败，请检查网络连接或联系甲方重新发布。");
       renderAll();
     }
   }
@@ -2182,12 +2210,17 @@
         [SIGN_WRITE_KEY]: signerWriteToken,
       })}`
       : buildSupabaseFunctionUrl();
+    const headers = {
+      apikey: supabaseConfig.anonKey,
+      Authorization: `Bearer ${supabaseConfig.anonKey}`,
+      Accept: "application/json",
+    };
+    if (method === "POST") {
+      headers["Content-Type"] = "application/json";
+    }
     const response = await fetch(url, {
       method,
-      headers: {
-        apikey: supabaseConfig.anonKey,
-        ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
-      },
+      headers,
       ...(method === "POST" ? { body: JSON.stringify(body) } : {}),
     });
     const text = await response.text();
@@ -2363,6 +2396,10 @@
     let changed = false;
     if (!localContract.snapshot && payloadContract.snapshot) {
       localContract.snapshot = clone(payloadContract.snapshot);
+      changed = true;
+    }
+    if (localContract.snapshot && !localContract.snapshot.fields) {
+      localContract.snapshot.fields = {};
       changed = true;
     }
     if (!localContract.signature && payloadContract.signature) {
@@ -2682,6 +2719,15 @@
       .filter((key) => params[key] != null && params[key] !== "")
       .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(String(params[key]))}`)
       .join("&");
+  }
+
+  function withTimeout(promise, timeoutMs, message) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        window.setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
   }
 
   function getUrlBase() {
