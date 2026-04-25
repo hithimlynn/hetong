@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260425-merge-sync-fix";
+  const BUILD_TAG = "20260425-party-a-sign-fix";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -1358,14 +1358,18 @@
   function setupPartyASignatureCanvas() {
     const canvas = document.getElementById("partyASignatureCanvas");
     if (!canvas) return;
-    const contract = currentContract();
     const context = canvas.getContext("2d");
-    const canEdit = contract && contract.status === "draft";
     let drawing = false;
+
+    function editableContract() {
+      const contract = currentContract();
+      return contract && contract.status === "draft" ? contract : null;
+    }
 
     function resize() {
       const rect = canvas.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
+      const contract = currentContract();
       const ratio = window.devicePixelRatio || 1;
       canvas.width = Math.max(1, Math.floor(rect.width * ratio));
       canvas.height = Math.max(1, Math.floor(rect.height * ratio));
@@ -1388,7 +1392,7 @@
     }
 
     canvas.addEventListener("pointerdown", (event) => {
-      if (!canEdit) return;
+      if (!editableContract()) return;
       drawing = true;
       canvas.setPointerCapture(event.pointerId);
       const p = point(event);
@@ -1418,21 +1422,23 @@
 
     const clearPartyButton = document.getElementById("clearPartyASignBtn");
     if (clearPartyButton) clearPartyButton.addEventListener("click", () => {
-      if (!contract || contract.status !== "draft") return;
+      const contract = editableContract();
+      if (!contract) return;
       context.clearRect(0, 0, canvas.width, canvas.height);
       contract.fields.partyASignature = "";
       contract.updatedAt = nowIso();
-      saveStore(true);
+      saveStore(true, { reason: "clear-party-a-signature", immediate: true });
       renderForm();
       renderPreview();
     });
 
     const savePartyButton = document.getElementById("savePartyASignBtn");
     if (savePartyButton) savePartyButton.addEventListener("click", () => {
-      if (!contract || contract.status !== "draft") return;
+      const contract = editableContract();
+      if (!contract) return;
       contract.fields.partyASignature = compactPartyASignatureDataUrl(canvas);
       contract.updatedAt = nowIso();
-      saveStore(true);
+      saveStore(true, { reason: "save-party-a-signature", immediate: true });
       renderForm();
       renderPreview();
     });
@@ -2186,7 +2192,7 @@
 
   function applyRemoteStorePayload(payload, _reason) {
     applyingRemoteStore = true;
-    store = normalizeStoreState(clone(payload));
+    store = mergeStoreStates(payload, store);
     saveStore(false, { skipRemote: true });
     applyingRemoteStore = false;
     renderAll();
