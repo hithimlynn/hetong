@@ -29,9 +29,7 @@ Deno.serve(async (request) => {
       const contractToken = String(url.searchParams.get("ct") || "").trim();
       const writeToken = String(url.searchParams.get("wt") || "").trim();
       const { contract } = await loadAuthorizedContract(workspaceId, contractToken, writeToken);
-      return jsonResponse({
-        contract: sanitizeContract(contract),
-      });
+      return jsonResponse({ contract: sanitizeContract(contract) });
     }
 
     if (request.method === "POST") {
@@ -86,16 +84,12 @@ Deno.serve(async (request) => {
 
       const { error } = await admin
         .from("workspace_state")
-        .update({
-          payload: store,
-        })
+        .update({ payload: store })
         .eq("workspace_id", row.workspace_id);
 
       if (error) throw error;
 
-      return jsonResponse({
-        contract: sanitizeContract(contract),
-      });
+      return jsonResponse({ contract: sanitizeContract(contract) });
     }
 
     return errorResponse("不支持的请求方法。", 405);
@@ -123,9 +117,11 @@ async function loadAuthorizedContract(workspaceId: string, contractToken: string
 
   const store = normalizeStore(row.payload);
   const contract = store.contracts.find((item: Record<string, unknown>) => item && item.token === contractToken);
+
   if (!contract) {
     throw new Error("未找到对应的合同。");
   }
+
   if (String(contract.signWriteToken || "") !== writeToken) {
     const authError = new Error("签署链接已失效或权限无效。");
     authError.name = "Forbidden";
@@ -163,7 +159,11 @@ function normalizeStore(payload: Record<string, unknown>) {
 function buildSnapshot(contract: Record<string, unknown>, store: Record<string, unknown>) {
   const clauseVersions = Array.isArray(store.clauseVersions) ? store.clauseVersions : [];
   const activeClauseVersionId = String(store.activeClauseVersionId || "");
-  const activeVersion = clauseVersions.find((version: Record<string, unknown>) => version.id === activeClauseVersionId) || clauseVersions[clauseVersions.length - 1] || {};
+  const activeVersion =
+    clauseVersions.find((version: Record<string, unknown>) => version.id === activeClauseVersionId) ||
+    clauseVersions[clauseVersions.length - 1] ||
+    {};
+
   return {
     fields: clone(contract.fields || {}),
     clauses: clone(activeVersion.sections || []),
@@ -183,7 +183,9 @@ async function makeSnapshotHash(snapshot: unknown, signature: Record<string, str
     },
   });
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
-  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 function clone<T>(value: T): T {

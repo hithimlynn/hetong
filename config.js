@@ -1,6 +1,6 @@
 window.__HETONG_SUPABASE__ = window.__HETONG_SUPABASE__ || {
-  url: "",
-  anonKey: "",
-  adminEmail: "",
+  url: "https://fvffxmrqpvgenxqrourq.supabase.co",
+  anonKey: "sb_publishable_JTQklQL55KLUcyw86C9B3A_PfHeV2NJ",
+  adminEmail: "hithimlynn@gmail.com",
   workspaceId: "hetong-main",
 };

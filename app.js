@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260424-supabase-sync";
+  const BUILD_TAG = "20260425-supabase-live";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
