@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260425-signer-cross-browser-fix";
+  const BUILD_TAG = "20260425-signature-visibility-fix";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -2467,7 +2467,6 @@
       const value = String(rawValue).trim();
       if (!value) return;
       if (String(DEFAULT_FIELDS[fieldKey] == null ? "" : DEFAULT_FIELDS[fieldKey]).trim() === value) return;
-      if (fieldKey === "partyASignature" && value.length > 3200) return;
       compact[shortKey] = value;
     });
     return compact;

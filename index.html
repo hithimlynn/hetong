@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>合同生成系统</title>
-    <link rel="stylesheet" href="./styles.css?v=20260425-signer-cross-browser-fix" />
+    <link rel="stylesheet" href="./styles.css?v=20260425-signature-visibility-fix" />
   </head>
   <body class="auth-locked">
     <section class="auth-screen" aria-label="甲方登录">
@@ -105,12 +105,6 @@
                   <input id="confirmCheckbox" type="checkbox" />
                   <span>已确认合同内容无误</span>
                 </label>
-                <label class="field signer-upload-field">
-                  <span>上传签名</span>
-                  <input id="signerUpload" type="file" accept="image/*" />
-                </label>
-                <div id="signerUploadState" class="upload-inline-status">未上传</div>
-                <img id="signerUploadPreview" class="signer-upload-preview" alt="乙方签名图片预览" hidden />
                 <div class="signature-pad">
                   <canvas id="signatureCanvas" aria-label="电子手写签名"></canvas>
                 </div>
@@ -118,6 +112,12 @@
                   <button class="ghost-button" id="clearSignBtn" type="button">清除</button>
                   <button class="primary-button" id="submitSignBtn" type="button">提交签署</button>
                 </div>
+                <label class="field signer-upload-field">
+                  <span>上传签名（可选）</span>
+                  <input id="signerUpload" type="file" accept="image/*" />
+                </label>
+                <div id="signerUploadState" class="upload-inline-status">未上传</div>
+                <img id="signerUploadPreview" class="signer-upload-preview" alt="乙方签名图片预览" hidden />
                 <div id="signMessage" class="status-note" hidden></div>
               </section>
             </div>
@@ -140,8 +140,8 @@
     </div>
 
     <div id="printRoot" aria-hidden="true"></div>
-    <script src="./config.js?v=20260425-signer-cross-browser-fix"></script>
-    <script src="./vendor/supabase.js?v=20260425-signer-cross-browser-fix"></script>
-    <script src="./app.js?v=20260425-signer-cross-browser-fix"></script>
+    <script src="./config.js?v=20260425-signature-visibility-fix"></script>
+    <script src="./vendor/supabase.js?v=20260425-signature-visibility-fix"></script>
+    <script src="./app.js?v=20260425-signature-visibility-fix"></script>
   </body>
 </html>
