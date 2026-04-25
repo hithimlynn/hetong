@@ -1,11 +1,18 @@
 (() => {
-  const BUILD_TAG = "20260424-mobile-panels-release";
+  const BUILD_TAG = "20260424-supabase-sync";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
   const SIGN_HASH_KEY = "s";
   const SIGN_PAYLOAD_KEY = "p";
+  const SIGN_WORKSPACE_KEY = "ws";
+  const SIGN_CONTRACT_KEY = "ct";
+  const SIGN_WRITE_KEY = "wt";
   const SIGN_LINK_VERSION = 1;
+  const SUPABASE_FUNCTION_NAME = "sign-contract";
+  const WORKSPACE_TABLE = "workspace_state";
+  const REMOTE_SYNC_DEBOUNCE_MS = 900;
+  const REMOTE_POLL_INTERVAL_MS = 4000;
   const CONTRACT_TITLE = "达人内容发布合作协议";
   const CLAUSE_SEED_VERSION = "wlead-pdf-2026-04-24";
   const CLAUSE_SEED_LABEL = "PDF基准 V2026.04.24";
@@ -176,11 +183,16 @@
     partyASignature: "",
   };
 
+  const supabaseConfig = normalizeSupabaseConfig(window.__HETONG_SUPABASE__ || {});
+
   let store = loadStore();
   let activeView = "editor";
   let signerToken = "";
+  let signerWorkspaceId = "";
+  let signerWriteToken = "";
   let signerPayloadContract = null;
   let signerLinkWarning = "";
+  let signerRemoteLoading = false;
   let signatureDirty = false;
   let signerUploadData = "";
   let signerUploadName = "";
@@ -188,17 +200,39 @@
   let openOptionPanelKey = "";
   let canvasReady = false;
   let resizeSignatureCanvas = () => {};
+  let supabaseClient = createSupabaseBrowserClient();
+  let adminSession = null;
+  let adminUser = null;
+  let remoteSyncTimer = 0;
+  let remotePollTimer = 0;
+  let remoteSyncQueue = Promise.resolve();
+  let remoteChannel = null;
+  let remoteBootstrapDone = false;
+  let applyingRemoteStore = false;
+  let remoteSyncState = {
+    connected: false,
+    syncing: false,
+    lastError: "",
+    lastPulledAt: "",
+    lastPushedAt: "",
+  };
 
   init();
 
-  function init() {
+  async function init() {
     window.__HETONG_BUILD__ = BUILD_TAG;
     document.documentElement.setAttribute("data-build", BUILD_TAG);
     bindEvents();
     parseHashRoute();
+    await initializeSupabaseSession();
     applyAuthGate();
     renderAll();
     setupSignatureCanvas();
+    if (signerWorkspaceId && signerToken) {
+      loadSignerContractFromCloud();
+    } else if (isAdminCloudReady()) {
+      bootstrapRemoteWorkspace();
+    }
     if (channel) {
       channel.onmessage = (event) => {
         if (event.data && event.data.from === INSTANCE_ID) return;
@@ -216,11 +250,31 @@
       parseHashRoute();
       applyAuthGate();
       renderAll();
+      if (signerWorkspaceId && signerToken) {
+        loadSignerContractFromCloud();
+      } else if (isAdminCloudReady()) {
+        pullRemoteWorkspace("route-change");
+      }
     });
     window.addEventListener("afterprint", () => {
       document.body.classList.remove("exporting-pdf");
       document.getElementById("printRoot").setAttribute("aria-hidden", "true");
       document.getElementById("printRoot").innerHTML = "";
+    });
+    window.addEventListener("focus", () => {
+      if (signerWorkspaceId && signerToken) {
+        loadSignerContractFromCloud();
+      } else if (isAdminCloudReady()) {
+        pullRemoteWorkspace("focus");
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible") return;
+      if (signerWorkspaceId && signerToken) {
+        loadSignerContractFromCloud();
+      } else if (isAdminCloudReady()) {
+        pullRemoteWorkspace("visibility");
+      }
     });
   }
 
@@ -231,10 +285,16 @@
         if (activeView !== "signer" && isSignerRoute()) {
           history.replaceState(null, "", location.pathname);
           signerToken = "";
+          signerWorkspaceId = "";
+          signerWriteToken = "";
           signerPayloadContract = null;
           signerLinkWarning = "";
+          signerRemoteLoading = false;
         }
         renderAll();
+        if (!signerToken && isAdminCloudReady()) {
+          pullRemoteWorkspace("tab-switch");
+        }
       });
     });
 
@@ -578,7 +638,9 @@
     const signerUpload = document.getElementById("signerUpload");
     const canSign = contract && ["published", "confirmed"].includes(contract.status);
     if (!contract) {
-      status.textContent = signerLinkWarning || "暂无可签署合同。请先由甲方发布合同，或打开乙方签署链接。";
+      status.textContent = signerRemoteLoading
+        ? "正在加载线上合同..."
+        : signerLinkWarning || "暂无可签署合同。请先由甲方发布合同，或打开乙方签署链接。";
       preview.innerHTML = "";
       meta.textContent = `${CONTRACT_TITLE} · 待发布`;
       signerNameInput.value = "";
@@ -658,9 +720,19 @@
   }
 
   function renderTopState() {
-    const contract = currentContract();
+    const contract = signerToken ? signerContract() : currentContract();
     const status = contract ? ((STATUS[contract.status] && STATUS[contract.status].label) || "草稿") : "无合同";
-    document.getElementById("syncState").textContent = `本地已同步 · ${status}`;
+    let syncLabel = "本地模式";
+    if (signerWorkspaceId && signerToken) {
+      syncLabel = signerRemoteLoading ? "线上合同加载中" : "线上合同";
+    } else if (remoteSyncState.lastError) {
+      syncLabel = "云端同步异常";
+    } else if (isAdminCloudReady() && remoteSyncState.connected) {
+      syncLabel = remoteSyncState.syncing ? "云端同步中" : "云端已同步";
+    } else if (hasSupabaseClientConfig()) {
+      syncLabel = adminSession ? "云端连接中" : "请登录云端";
+    }
+    document.getElementById("syncState").textContent = `${syncLabel} · ${status}`;
   }
 
   function renderEditableContractDocument(contract) {
@@ -864,7 +936,7 @@
     store.selectedId = contract.id;
     activeView = "editor";
     document.getElementById("searchInput").value = "";
-    saveStore(true);
+    saveStore(true, { reason: "create-contract", immediate: true });
     renderAll();
   }
 
@@ -872,13 +944,13 @@
     const contract = currentContract();
     if (!contract) return;
     contract.updatedAt = nowIso();
-    saveStore(true);
+    saveStore(true, { reason: "save-draft" });
     showValidation([]);
     renderForm();
     renderPreview();
   }
 
-  function publishContract() {
+  async function publishContract() {
     const contract = currentContract();
     if (!contract || contract.status !== "draft") return;
     const errors = validateContract(contract);
@@ -889,6 +961,7 @@
     contract.status = "published";
     contract.publishedAt = nowIso();
     contract.token = contract.token || randomToken(18);
+    contract.signWriteToken = contract.signWriteToken || randomToken(24);
     contract.snapshot = {
       fields: clone(contract.fields),
       clauses: clone(activeClauseVersion().sections),
@@ -897,7 +970,10 @@
       publishedAt: contract.publishedAt,
     };
     contract.audit.push(makeAudit("发布合同", "生成乙方签署链接并锁定合同快照"));
-    saveStore(true);
+    saveStore(true, { reason: "publish-contract", immediate: true });
+    if (isAdminCloudReady()) {
+      await flushRemoteStore("publish-contract");
+    }
     showValidation([]);
     renderAll();
   }
@@ -907,7 +983,7 @@
     if (!contract || !["published", "confirmed"].includes(contract.status)) return;
     contract.status = "revoked";
     contract.audit.push(makeAudit("撤回合同", "乙方签署链接失效"));
-    saveStore(true);
+    saveStore(true, { reason: "revoke-contract", immediate: true });
     renderAll();
   }
 
@@ -918,7 +994,11 @@
     contract.status = "confirmed";
     contract.confirmedAt = nowIso();
     contract.audit.push(makeAudit("乙方确认", "乙方勾选已确认合同内容无误"));
-    saveStore(true);
+    if (signerWorkspaceId && signerToken) {
+      renderAll();
+      return;
+    }
+    saveStore(true, { reason: "confirm-signer", immediate: true });
     renderAll();
   }
 
@@ -952,12 +1032,34 @@
       userAgent: navigator.userAgent,
     };
     signature.snapshotHash = await makeSnapshotHash(contract.snapshot || { fields: contract.fields, clauses: clone(activeClauseVersion().sections) }, signature);
+    if (signerWorkspaceId && signerToken) {
+      try {
+        signerRemoteLoading = true;
+        renderTopState();
+        const remoteContract = await submitRemoteSignature({
+          signerName,
+          imageData: signatureImage,
+          userAgent: navigator.userAgent,
+        });
+        signerPayloadContract = normalizeContract(remoteContract);
+        signerPayloadContract.signature = clone(remoteContract.signature || signerPayloadContract.signature);
+        mergeRemoteContractIntoLocalStore(signerPayloadContract);
+        signerRemoteLoading = false;
+        showSignMessage("签署已完成，已直接同步给甲方。", "ok");
+        renderAll();
+      } catch (error) {
+        signerRemoteLoading = false;
+        showSignMessage(friendlyCloudError(error, "线上签署提交失败，请稍后重试。"));
+        renderTopState();
+      }
+      return;
+    }
     contract.status = "signed";
     contract.signedAt = signature.signedAt;
     contract.signature = signature;
     syncSignedSignature(contract);
     contract.audit.push(makeAudit("乙方签署", `${signerName} 完成电子手写签名`));
-    saveStore(true);
+    saveStore(true, { reason: "submit-signature", immediate: true });
     showSignMessage("签署已完成，合同预览和导出 PDF 会显示乙方签名。", "ok");
     renderAll();
   }
@@ -973,12 +1075,15 @@
     store.selectedId = item.dataset.contractId;
     activeView = "editor";
     signerToken = "";
+    signerWorkspaceId = "";
+    signerWriteToken = "";
     signerPayloadContract = null;
     signerLinkWarning = "";
+    signerRemoteLoading = false;
     if (isSignerRoute()) {
       history.replaceState(null, "", location.pathname);
     }
-    saveStore(false);
+    saveStore(false, { skipRemote: true });
     renderAll();
   }
 
@@ -995,7 +1100,7 @@
     } else if (store.selectedId === contractId) {
       store.selectedId = store.contracts[0].id;
     }
-    saveStore(true);
+    saveStore(true, { reason: "delete-contract", immediate: true });
     renderAll();
   }
 
@@ -1344,41 +1449,15 @@
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) {
       try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed.contracts) && parsed.contracts.length) {
-          parsed.contracts = parsed.contracts.map(normalizeContract);
-          parsed.brandOptions = normalizeOptions(
-            parsed.brandOptions,
-            Array.isArray(parsed.brandOptions) ? [] : DEFAULT_BRAND_OPTIONS,
-            Array.isArray(parsed.brandOptions) ? [] : parsed.contracts.map((contract) => contract.fields.brand),
-          );
-          parsed.platformOptions = normalizeOptions(
-            parsed.platformOptions,
-            Array.isArray(parsed.platformOptions) ? [] : DEFAULT_PLATFORM_OPTIONS,
-            Array.isArray(parsed.platformOptions) ? [] : parsed.contracts.map((contract) => contract.fields.platform),
-          );
-          parsed.clauseVersions = normalizeClauseVersions(parsed.clauseVersions);
-          const seededVersion = parsed.clauseVersions.find((version) => version.seedVersion === CLAUSE_SEED_VERSION);
-          if (seededVersion && parsed.lastAppliedClauseSeed !== CLAUSE_SEED_VERSION) {
-            parsed.activeClauseVersionId = seededVersion.id;
-            parsed.lastAppliedClauseSeed = CLAUSE_SEED_VERSION;
-          } else {
-            parsed.activeClauseVersionId = parsed.clauseVersions.some((version) => version.id === parsed.activeClauseVersionId)
-              ? parsed.activeClauseVersionId
-              : parsed.clauseVersions[parsed.clauseVersions.length - 1].id;
-          }
-          if (!parsed.contracts.some((contract) => contract.id === parsed.selectedId)) {
-            parsed.selectedId = parsed.contracts[0].id;
-          }
-          if (!parsed.lastAppliedClauseSeed) {
-            parsed.lastAppliedClauseSeed = CLAUSE_SEED_VERSION;
-          }
-          return parsed;
-        }
+        return normalizeStoreState(JSON.parse(raw));
       } catch (error) {
         console.warn("Failed to load store", error);
       }
     }
+    return defaultStoreState();
+  }
+
+  function defaultStoreState() {
     const contract = makeContract();
     const clauseVersions = seedClauseVersions();
     return {
@@ -1390,6 +1469,41 @@
       activeClauseVersionId: clauseVersions[0].id,
       lastAppliedClauseSeed: CLAUSE_SEED_VERSION,
     };
+  }
+
+  function normalizeStoreState(parsed) {
+    if (!parsed || !Array.isArray(parsed.contracts) || !parsed.contracts.length) return defaultStoreState();
+    const next = {
+      selectedId: parsed.selectedId || "",
+      contracts: parsed.contracts.map(normalizeContract),
+      brandOptions: normalizeOptions(
+        parsed.brandOptions,
+        Array.isArray(parsed.brandOptions) ? [] : DEFAULT_BRAND_OPTIONS,
+        Array.isArray(parsed.brandOptions) ? [] : parsed.contracts.map((contract) => getIn(contract, ["fields", "brand"])),
+      ),
+      platformOptions: normalizeOptions(
+        parsed.platformOptions,
+        Array.isArray(parsed.platformOptions) ? [] : DEFAULT_PLATFORM_OPTIONS,
+        Array.isArray(parsed.platformOptions) ? [] : parsed.contracts.map((contract) => getIn(contract, ["fields", "platform"])),
+      ),
+      clauseVersions: normalizeClauseVersions(parsed.clauseVersions),
+      activeClauseVersionId: parsed.activeClauseVersionId || "",
+      lastAppliedClauseSeed: parsed.lastAppliedClauseSeed || "",
+    };
+    const seededVersion = next.clauseVersions.find((version) => version.seedVersion === CLAUSE_SEED_VERSION);
+    if (seededVersion && next.lastAppliedClauseSeed !== CLAUSE_SEED_VERSION) {
+      next.activeClauseVersionId = seededVersion.id;
+      next.lastAppliedClauseSeed = CLAUSE_SEED_VERSION;
+    } else {
+      next.activeClauseVersionId = next.clauseVersions.some((version) => version.id === next.activeClauseVersionId)
+        ? next.activeClauseVersionId
+        : next.clauseVersions[next.clauseVersions.length - 1].id;
+    }
+    if (!next.contracts.some((contract) => contract.id === next.selectedId)) {
+      next.selectedId = next.contracts[0].id;
+    }
+    if (!next.lastAppliedClauseSeed) next.lastAppliedClauseSeed = CLAUSE_SEED_VERSION;
+    return next;
   }
 
   function normalizeContract(contract) {
@@ -1407,6 +1521,7 @@
     return {
       ...contract,
       token: contract.token || randomToken(18),
+      signWriteToken: contract.signWriteToken || randomToken(24),
       audit: Array.isArray(contract.audit) ? contract.audit : [],
       fields,
       snapshot,
@@ -1520,9 +1635,12 @@
     return platform || account || "-";
   }
 
-  function saveStore(announce) {
+  function saveStore(announce, options = {}) {
     localStorage.setItem(STORE_KEY, JSON.stringify(store));
     if (announce && channel) channel.postMessage({ from: INSTANCE_ID, at: nowIso() });
+    if (!options.skipRemote) {
+      scheduleRemoteStoreSync(options.reason || "store-change", options.immediate === true);
+    }
   }
 
   function makeContract(fields = {}) {
@@ -1531,6 +1649,7 @@
       id: randomToken(12),
       status: "draft",
       token: randomToken(18),
+      signWriteToken: randomToken(24),
       fields: { ...DEFAULT_FIELDS, ...fields },
       snapshot: null,
       signature: null,
@@ -1571,6 +1690,11 @@
 
   function signerContract() {
     if (signerToken) {
+      if (signerWorkspaceId) {
+        return signerPayloadContract
+          || store.contracts.find((contract) => contract.token === signerToken)
+          || null;
+      }
       const localContract = store.contracts.find((contract) => contract.token === signerToken) || null;
       if (localContract) {
         hydrateLocalSignerContract(localContract, signerPayloadContract);
@@ -1579,6 +1703,21 @@
       return signerPayloadContract || null;
     }
     return currentContract();
+  }
+
+  function mergeRemoteContractIntoLocalStore(remoteContract) {
+    if (!remoteContract) return false;
+    const target = store.contracts.find((contract) => (
+      (remoteContract.id && contract.id === remoteContract.id)
+      || (remoteContract.token && contract.token === remoteContract.token)
+    ));
+    if (!target) return false;
+    const normalized = normalizeContract(remoteContract);
+    const before = JSON.stringify(target);
+    Object.assign(target, clone(normalized));
+    if (before === JSON.stringify(target)) return false;
+    saveStore(false, { skipRemote: true });
+    return true;
   }
 
   function renderFields(contract) {
@@ -1631,9 +1770,25 @@
   }
 
   function parseHashRoute() {
+    signerWorkspaceId = "";
+    signerWriteToken = "";
     signerPayloadContract = null;
     signerLinkWarning = "";
+    signerRemoteLoading = false;
     const params = parseSignerParams();
+    const workspaceId = params.get(SIGN_WORKSPACE_KEY) || "";
+    const cloudToken = params.get(SIGN_CONTRACT_KEY) || "";
+    const writeToken = params.get(SIGN_WRITE_KEY) || "";
+    if (workspaceId && cloudToken) {
+      signerToken = cloudToken;
+      signerWorkspaceId = workspaceId;
+      signerWriteToken = writeToken;
+      signerLinkWarning = hasSupabaseClientConfig()
+        ? "正在加载线上合同..."
+        : "当前页面尚未配置 Supabase，无法读取线上合同。";
+      activeView = "signer";
+      return;
+    }
     const token = params.get(SIGN_HASH_KEY) || params.get("sign") || "";
     if (token) {
       signerToken = token;
@@ -1646,34 +1801,430 @@
       activeView = "signer";
     } else {
       signerToken = "";
+      signerWorkspaceId = "";
+      signerWriteToken = "";
       signerUploadKey = "";
       resetSignerUpload();
     }
   }
 
   function applyAuthGate() {
-    const authenticated = localStorage.getItem(AUTH_KEY) === "ok";
+    const authenticated = isAdminAuthenticated();
     document.body.classList.toggle("auth-locked", !signerToken && !authenticated);
   }
 
-  function handleAuthSubmit(event) {
+  async function handleAuthSubmit(event) {
     event.preventDefault();
     const input = document.getElementById("authPassword");
     const message = document.getElementById("authMessage");
-    if (input.value === "87654321") {
+    if (!hasAdminCloudConfig()) {
+      if (input.value === "87654321") {
+        localStorage.setItem(AUTH_KEY, "ok");
+        input.value = "";
+        message.hidden = true;
+        applyAuthGate();
+        renderAll();
+        return;
+      }
+      message.hidden = false;
+      message.textContent = "密码错误，请重新输入。";
+      input.select();
+      return;
+    }
+    if (!supabaseClient) {
+      message.hidden = false;
+      message.textContent = "Supabase 客户端未加载成功，请刷新页面后重试。";
+      return;
+    }
+    message.hidden = false;
+    message.textContent = "正在登录云端工作区...";
+    try {
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email: supabaseConfig.adminEmail,
+        password: input.value,
+      });
+      if (error) throw error;
+      adminSession = data.session || null;
+      adminUser = data.user || (data.session ? data.session.user : null);
       localStorage.setItem(AUTH_KEY, "ok");
       input.value = "";
       message.hidden = true;
       applyAuthGate();
+      await bootstrapRemoteWorkspace();
+      renderAll();
+      return;
+    } catch (error) {
+      message.hidden = false;
+      message.textContent = friendlyCloudError(error, "登录失败，请检查密码或 Supabase 配置。");
+      input.select();
+    }
+  }
+
+  function normalizeSupabaseConfig(config) {
+    const next = {
+      url: String(config && config.url || "").trim().replace(/\/+$/, ""),
+      anonKey: String(config && config.anonKey || "").trim(),
+      adminEmail: String(config && config.adminEmail || "").trim(),
+      workspaceId: String(config && config.workspaceId || "").trim(),
+    };
+    next.clientReady = Boolean(next.url && next.anonKey);
+    next.adminReady = Boolean(next.clientReady && next.adminEmail && next.workspaceId);
+    return next;
+  }
+
+  function createSupabaseBrowserClient() {
+    try {
+      if (!hasSupabaseClientConfig()) return null;
+      if (!window.supabase || typeof window.supabase.createClient !== "function") return null;
+      return window.supabase.createClient(supabaseConfig.url, supabaseConfig.anonKey, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+        },
+      });
+    } catch (error) {
+      console.warn("Failed to create Supabase client", error);
+      return null;
+    }
+  }
+
+  function hasSupabaseClientConfig() {
+    return Boolean(supabaseConfig.clientReady);
+  }
+
+  function hasAdminCloudConfig() {
+    return Boolean(supabaseConfig.adminReady);
+  }
+
+  function isAdminAuthenticated() {
+    if (hasAdminCloudConfig()) return Boolean(adminSession);
+    return localStorage.getItem(AUTH_KEY) === "ok";
+  }
+
+  function isAdminCloudReady() {
+    return Boolean(hasAdminCloudConfig() && supabaseClient && adminSession && adminUser);
+  }
+
+  async function initializeSupabaseSession() {
+    if (!supabaseClient) return;
+    supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+      adminSession = session || null;
+      adminUser = session && session.user ? session.user : null;
+      if (adminSession) {
+        localStorage.setItem(AUTH_KEY, "ok");
+        applyAuthGate();
+        renderAll();
+        await bootstrapRemoteWorkspace();
+      } else {
+        localStorage.removeItem(AUTH_KEY);
+        adminSession = null;
+        adminUser = null;
+        remoteBootstrapDone = false;
+        stopRemoteSubscription();
+        stopRemotePolling();
+        applyAuthGate();
+        renderAll();
+      }
+    });
+    const { data, error } = await supabaseClient.auth.getSession();
+    if (error) {
+      remoteSyncState.lastError = friendlyCloudError(error, "读取 Supabase 会话失败。");
+      return;
+    }
+    adminSession = data.session || null;
+    adminUser = adminSession && adminSession.user ? adminSession.user : null;
+    if (adminSession) {
+      localStorage.setItem(AUTH_KEY, "ok");
+    }
+  }
+
+  async function bootstrapRemoteWorkspace() {
+    if (!isAdminCloudReady()) return false;
+    try {
+      startRemoteSubscription();
+      startRemotePolling();
+      if (remoteBootstrapDone) {
+        return pullRemoteWorkspace("bootstrap-refresh");
+      }
+      remoteBootstrapDone = true;
+      const row = await fetchRemoteWorkspaceState();
+      if (row && row.payload && Array.isArray(row.payload.contracts) && row.payload.contracts.length) {
+        applyRemoteStorePayload(row.payload, "bootstrap");
+        remoteSyncState.connected = true;
+        remoteSyncState.lastPulledAt = nowIso();
+        remoteSyncState.lastError = "";
+        renderTopState();
+        return true;
+      }
+      await upsertRemoteWorkspaceState(store, "bootstrap-import");
+      remoteSyncState.connected = true;
+      remoteSyncState.lastPushedAt = nowIso();
+      remoteSyncState.lastError = "";
+      renderTopState();
+      return true;
+    } catch (error) {
+      remoteSyncState.lastError = friendlyCloudError(error, "云端工作区初始化失败。");
+      renderTopState();
+      return false;
+    }
+  }
+
+  function startRemoteSubscription() {
+    if (!isAdminCloudReady() || remoteChannel) return;
+    remoteChannel = supabaseClient
+      .channel(`workspace:${supabaseConfig.workspaceId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: WORKSPACE_TABLE,
+          filter: `workspace_id=eq.${supabaseConfig.workspaceId}`,
+        },
+        () => {
+          pullRemoteWorkspace("realtime");
+        },
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          remoteSyncState.connected = true;
+          remoteSyncState.lastError = "";
+          renderTopState();
+        }
+      });
+  }
+
+  function stopRemoteSubscription() {
+    if (!supabaseClient || !remoteChannel) return;
+    try {
+      supabaseClient.removeChannel(remoteChannel);
+    } catch (error) {
+      console.warn("Failed to remove Supabase channel", error);
+    }
+    remoteChannel = null;
+  }
+
+  function startRemotePolling() {
+    if (remotePollTimer || !hasSupabaseClientConfig()) return;
+    remotePollTimer = window.setInterval(() => {
+      if (!isAdminCloudReady()) return;
+      if (document.hidden) return;
+      if (activeView === "signer" || signerToken) return;
+      pullRemoteWorkspace("poll");
+    }, REMOTE_POLL_INTERVAL_MS);
+  }
+
+  function stopRemotePolling() {
+    if (!remotePollTimer) return;
+    clearInterval(remotePollTimer);
+    remotePollTimer = 0;
+  }
+
+  function scheduleRemoteStoreSync(reason, immediate) {
+    if (!isAdminCloudReady() || applyingRemoteStore) return;
+    if (remoteSyncTimer) {
+      clearTimeout(remoteSyncTimer);
+      remoteSyncTimer = 0;
+    }
+    if (immediate) {
+      flushRemoteStore(reason);
+      return;
+    }
+    remoteSyncTimer = window.setTimeout(() => {
+      remoteSyncTimer = 0;
+      flushRemoteStore(reason);
+    }, REMOTE_SYNC_DEBOUNCE_MS);
+  }
+
+  function flushRemoteStore(reason) {
+    if (!isAdminCloudReady() || applyingRemoteStore) return Promise.resolve(false);
+    if (remoteSyncTimer) {
+      clearTimeout(remoteSyncTimer);
+      remoteSyncTimer = 0;
+    }
+    return runRemoteSyncTask(async () => {
+      await upsertRemoteWorkspaceState(store, reason);
+      remoteSyncState.connected = true;
+      remoteSyncState.lastPushedAt = nowIso();
+      remoteSyncState.lastError = "";
+      renderTopState();
+      return true;
+    }).catch((error) => {
+      remoteSyncState.lastError = friendlyCloudError(error, "云端保存失败。");
+      renderTopState();
+      return false;
+    });
+  }
+
+  function pullRemoteWorkspace(reason) {
+    if (!isAdminCloudReady()) return Promise.resolve(false);
+    return runRemoteSyncTask(async () => {
+      const row = await fetchRemoteWorkspaceState();
+      if (row && row.payload) {
+        applyRemoteStorePayload(row.payload, reason);
+        remoteSyncState.connected = true;
+        remoteSyncState.lastPulledAt = nowIso();
+        remoteSyncState.lastError = "";
+        renderTopState();
+        return true;
+      }
+      return false;
+    }).catch((error) => {
+      remoteSyncState.lastError = friendlyCloudError(error, "读取云端合同失败。");
+      renderTopState();
+      return false;
+    });
+  }
+
+  function runRemoteSyncTask(task) {
+    remoteSyncState.syncing = true;
+    renderTopState();
+    const runner = remoteSyncQueue.then(task);
+    remoteSyncQueue = runner.catch(() => {});
+    return runner.finally(() => {
+      remoteSyncState.syncing = false;
+      renderTopState();
+    });
+  }
+
+  async function fetchRemoteWorkspaceState() {
+    const { data, error } = await supabaseClient
+      .from(WORKSPACE_TABLE)
+      .select("workspace_id,payload,updated_at")
+      .eq("workspace_id", supabaseConfig.workspaceId)
+      .maybeSingle();
+    if (error) throw error;
+    return data || null;
+  }
+
+  async function upsertRemoteWorkspaceState(nextStore, reason) {
+    const payload = normalizeStoreState(clone(nextStore));
+    const { error } = await supabaseClient
+      .from(WORKSPACE_TABLE)
+      .upsert(
+        {
+          workspace_id: supabaseConfig.workspaceId,
+          owner_id: adminUser.id,
+          payload,
+        },
+        { onConflict: "workspace_id" },
+      )
+      .select("workspace_id")
+      .single();
+    if (error) throw error;
+    return reason;
+  }
+
+  function applyRemoteStorePayload(payload, _reason) {
+    applyingRemoteStore = true;
+    store = normalizeStoreState(clone(payload));
+    saveStore(false, { skipRemote: true });
+    applyingRemoteStore = false;
+    renderAll();
+  }
+
+  async function loadSignerContractFromCloud() {
+    if (!signerWorkspaceId || !signerToken) return;
+    if (!hasSupabaseClientConfig()) {
+      signerLinkWarning = "当前页面尚未配置 Supabase，无法读取线上合同。";
       renderAll();
       return;
     }
-    message.hidden = false;
-    message.textContent = "密码错误，请重新输入。";
-    input.select();
+    signerRemoteLoading = true;
+    signerLinkWarning = "正在加载线上合同...";
+    renderAll();
+    try {
+      const remoteContract = await fetchSignerContractFromCloud();
+      signerPayloadContract = normalizeContract(remoteContract);
+      signerLinkWarning = "";
+      signerRemoteLoading = false;
+      mergeRemoteContractIntoLocalStore(signerPayloadContract);
+      renderAll();
+    } catch (error) {
+      signerPayloadContract = null;
+      signerRemoteLoading = false;
+      signerLinkWarning = friendlyCloudError(error, "线上合同读取失败，请让甲方重新发布链接。");
+      renderAll();
+    }
+  }
+
+  async function fetchSignerContractFromCloud() {
+    const response = await callSignerFunction("GET");
+    if (!response || !response.contract) {
+      throw new Error("未找到对应的线上合同。");
+    }
+    return response.contract;
+  }
+
+  async function submitRemoteSignature(payload) {
+    const response = await callSignerFunction("POST", {
+      ws: signerWorkspaceId,
+      ct: signerToken,
+      wt: signerWriteToken,
+      signerName: payload.signerName,
+      imageData: payload.imageData,
+      userAgent: payload.userAgent,
+    });
+    if (!response || !response.contract) {
+      throw new Error("签署结果返回不完整。");
+    }
+    return response.contract;
+  }
+
+  async function callSignerFunction(method, body) {
+    if (!hasSupabaseClientConfig()) {
+      throw new Error("Supabase 尚未配置。");
+    }
+    const url = method === "GET"
+      ? `${buildSupabaseFunctionUrl()}?${buildQueryString({
+        [SIGN_WORKSPACE_KEY]: signerWorkspaceId,
+        [SIGN_CONTRACT_KEY]: signerToken,
+        [SIGN_WRITE_KEY]: signerWriteToken,
+      })}`
+      : buildSupabaseFunctionUrl();
+    const response = await fetch(url, {
+      method,
+      headers: {
+        apikey: supabaseConfig.anonKey,
+        ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
+      },
+      ...(method === "POST" ? { body: JSON.stringify(body) } : {}),
+    });
+    const text = await response.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (error) {
+      data = { error: text || "线上签署服务响应异常。" };
+    }
+    if (!response.ok) {
+      throw new Error(data && data.error ? data.error : "线上签署服务请求失败。");
+    }
+    return data;
+  }
+
+  function buildSupabaseFunctionUrl() {
+    return `${supabaseConfig.url}/functions/v1/${SUPABASE_FUNCTION_NAME}`;
+  }
+
+  function friendlyCloudError(error, fallbackMessage) {
+    const message = error && error.message ? String(error.message) : "";
+    if (!message) return fallbackMessage;
+    if (/Invalid login credentials/i.test(message)) return "密码错误，请重新输入。";
+    if (/Failed to fetch/i.test(message)) return "网络连接失败，请检查 Supabase 地址或当前网络。";
+    if (/JWT|permission|not allowed/i.test(message)) return "当前云端权限不足，请检查 Supabase 配置。";
+    return message;
   }
 
   function buildSignLink(contract) {
+    if (hasAdminCloudConfig()) {
+      contract.signWriteToken = contract.signWriteToken || randomToken(24);
+      return `${getUrlBase()}?${buildQueryString({
+        [SIGN_WORKSPACE_KEY]: supabaseConfig.workspaceId,
+        [SIGN_CONTRACT_KEY]: contract.token,
+        [SIGN_WRITE_KEY]: contract.signWriteToken,
+      })}`;
+    }
     const payload = encodeSignPayload(contract);
     return `${getUrlBase()}?${buildQueryString({
       [SIGN_HASH_KEY]: contract.token,
@@ -1844,18 +2395,28 @@
       localContract.signedAt = payloadContract.signedAt;
       changed = true;
     }
-    if (changed) saveStore(false);
+    if (changed) saveStore(false, { skipRemote: true });
   }
 
   function parseSignerParams() {
     const searchParams = createParamBag(location.search);
-    if (searchParams.get(SIGN_HASH_KEY) || searchParams.get("sign")) return searchParams;
+    if (
+      searchParams.get(SIGN_WORKSPACE_KEY)
+      || searchParams.get(SIGN_CONTRACT_KEY)
+      || searchParams.get(SIGN_HASH_KEY)
+      || searchParams.get("sign")
+    ) return searchParams;
     return createParamBag(location.hash);
   }
 
   function isSignerRoute() {
     const searchParams = createParamBag(location.search);
-    if (searchParams.get(SIGN_HASH_KEY) || searchParams.get("sign")) return true;
+    if (
+      searchParams.get(SIGN_WORKSPACE_KEY)
+      || searchParams.get(SIGN_CONTRACT_KEY)
+      || searchParams.get(SIGN_HASH_KEY)
+      || searchParams.get("sign")
+    ) return true;
     return location.hash.startsWith(`#${SIGN_HASH_KEY}=`) || location.hash.startsWith("#sign=");
   }
 
