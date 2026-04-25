@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260425-party-a-sign-fix";
+  const BUILD_TAG = "20260425-signer-cross-browser-fix";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -14,6 +14,7 @@
   const REMOTE_SYNC_DEBOUNCE_MS = 900;
   const REMOTE_POLL_INTERVAL_MS = 4000;
   const REMOTE_REQUEST_TIMEOUT_MS = 8000;
+  const REMOTE_SAVE_RETRY_LIMIT = 3;
   const CONTRACT_TITLE = "达人内容发布合作协议";
   const CLAUSE_SEED_VERSION = "wlead-pdf-2026-04-24";
   const CLAUSE_SEED_LABEL = "PDF基准 V2026.04.24";
@@ -976,7 +977,7 @@
       publishedAt: contract.publishedAt,
     };
     contract.audit.push(makeAudit("发布合同", "生成乙方签署链接并锁定合同快照"));
-    saveStore(true, { reason: "publish-contract", immediate: true });
+    saveStore(true, { reason: "publish-contract", skipRemote: true });
     showValidation([]);
     renderAll();
     if (isAdminCloudReady()) {
@@ -1770,12 +1771,17 @@
 
   function mergeRemoteContractIntoLocalStore(remoteContract) {
     if (!remoteContract) return false;
+    const normalized = normalizeContract(remoteContract);
     const target = store.contracts.find((contract) => (
       (remoteContract.id && contract.id === remoteContract.id)
       || (remoteContract.token && contract.token === remoteContract.token)
     ));
-    if (!target) return false;
-    const normalized = normalizeContract(remoteContract);
+    if (!target) {
+      store.contracts.unshift(clone(normalized));
+      store.selectedId = store.selectedId || normalized.id;
+      saveStore(false, { skipRemote: true });
+      return true;
+    }
     const before = JSON.stringify(target);
     Object.assign(target, clone(normalized));
     if (before === JSON.stringify(target)) return false;
@@ -1846,6 +1852,7 @@
       signerToken = cloudToken;
       signerWorkspaceId = workspaceId;
       signerWriteToken = writeToken;
+      signerPayloadContract = decodeSignPayload(params.get(SIGN_PAYLOAD_KEY) || params.get("payload"), signerToken);
       signerLinkWarning = hasSupabaseClientConfig()
         ? "正在加载线上合同..."
         : "当前页面尚未配置 Supabase，无法读取线上合同。";
@@ -2164,29 +2171,55 @@
     return data || null;
   }
 
-  async function upsertRemoteWorkspaceState(nextStore, reason) {
+  async function upsertRemoteWorkspaceState(nextStore, reason, attempt = 0) {
     const localPayload = normalizeStoreState(clone(nextStore));
     const remoteRow = await fetchRemoteWorkspaceState();
     const payload = remoteRow && remoteRow.payload
       ? mergeStoreStates(remoteRow.payload, localPayload)
       : localPayload;
-    const { error } = await withTimeout(
-      supabaseClient
-        .from(WORKSPACE_TABLE)
-        .upsert(
-          {
+    if (!remoteRow) {
+      const { error } = await withTimeout(
+        supabaseClient
+          .from(WORKSPACE_TABLE)
+          .insert({
             workspace_id: supabaseConfig.workspaceId,
             owner_id: adminUser.id,
             payload,
-          },
-          { onConflict: "workspace_id" },
-        )
-        .select("workspace_id")
-        .single(),
+          })
+          .select("workspace_id")
+          .single(),
+        REMOTE_REQUEST_TIMEOUT_MS,
+        "Cloud workspace save timed out. Please try again.",
+      );
+      if (error) {
+        if (attempt < REMOTE_SAVE_RETRY_LIMIT && isRetryableWorkspaceConflict(error)) {
+          return upsertRemoteWorkspaceState(localPayload, reason, attempt + 1);
+        }
+        throw error;
+      }
+      return reason;
+    }
+    const { data, error } = await withTimeout(
+      supabaseClient
+        .from(WORKSPACE_TABLE)
+        .update({
+          owner_id: adminUser.id,
+          payload,
+        })
+        .eq("workspace_id", supabaseConfig.workspaceId)
+        .eq("updated_at", remoteRow.updated_at)
+        .select("workspace_id,updated_at")
+        .maybeSingle(),
       REMOTE_REQUEST_TIMEOUT_MS,
       "Cloud workspace save timed out. Please try again.",
     );
     if (error) throw error;
+    if (!data) {
+      if (attempt < REMOTE_SAVE_RETRY_LIMIT) {
+        return upsertRemoteWorkspaceState(localPayload, reason, attempt + 1);
+      }
+      throw new Error("Cloud workspace changed on another device. Please retry.");
+    }
     return reason;
   }
 
@@ -2272,7 +2305,6 @@
       mergeRemoteContractIntoLocalStore(signerPayloadContract);
       renderAll();
     } catch (error) {
-      signerPayloadContract = null;
       signerRemoteLoading = false;
       signerLinkWarning = friendlyCloudError(error, "线上合同加载失败，请检查网络连接或联系甲方重新发布。");
       renderAll();
@@ -2295,6 +2327,7 @@
       signerName: payload.signerName,
       imageData: payload.imageData,
       userAgent: payload.userAgent,
+      fallbackContract: buildSignerFallbackContract(signerContract()),
     });
     if (!response || !response.contract) {
       throw new Error("签署结果返回不完整。");
@@ -2353,15 +2386,16 @@
   }
 
   function buildSignLink(contract) {
+    const payload = encodeSignPayload(contract);
     if (hasAdminCloudConfig()) {
       contract.signWriteToken = contract.signWriteToken || randomToken(24);
       return `${getUrlBase()}?${buildQueryString({
         [SIGN_WORKSPACE_KEY]: supabaseConfig.workspaceId,
         [SIGN_CONTRACT_KEY]: contract.token,
         [SIGN_WRITE_KEY]: contract.signWriteToken,
+        [SIGN_PAYLOAD_KEY]: payload,
       })}`;
     }
-    const payload = encodeSignPayload(contract);
     return `${getUrlBase()}?${buildQueryString({
       [SIGN_HASH_KEY]: contract.token,
       [SIGN_PAYLOAD_KEY]: payload,
@@ -2536,6 +2570,23 @@
       changed = true;
     }
     if (changed) saveStore(false, { skipRemote: true });
+  }
+
+  function buildSignerFallbackContract(contract) {
+    if (!contract) return null;
+    return {
+      id: contract.id || "",
+      token: contract.token || "",
+      status: contract.status || "published",
+      fields: clone(contract.fields || {}),
+      snapshot: clone(contract.snapshot || null),
+      signature: clone(contract.signature || null),
+      confirmedAt: contract.confirmedAt || "",
+      signedAt: contract.signedAt || "",
+      publishedAt: contract.publishedAt || "",
+      updatedAt: contract.updatedAt || "",
+      createdAt: contract.createdAt || "",
+    };
   }
 
   function parseSignerParams() {
@@ -2866,6 +2917,12 @@
       if (Number.isFinite(time) && time > latest) latest = time;
     });
     return latest;
+  }
+
+  function isRetryableWorkspaceConflict(error) {
+    const code = String(error && error.code || "").trim();
+    const message = String(error && error.message || "").trim();
+    return code === "23505" || /duplicate/i.test(message) || /conflict/i.test(message);
   }
 
   function mergeClauseVersions(remoteVersions, localVersions) {

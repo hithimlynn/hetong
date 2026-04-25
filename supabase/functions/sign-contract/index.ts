@@ -40,11 +40,12 @@ Deno.serve(async (request) => {
       const signerName = String(payload.signerName || "").trim();
       const imageData = String(payload.imageData || "").trim();
       const userAgent = String(payload.userAgent || "").trim();
+      const fallbackContract = payload.fallbackContract;
 
       if (!signerName) return errorResponse("缺少签署人姓名。", 400);
       if (!imageData.startsWith("data:image/")) return errorResponse("签名图片格式无效。", 400);
 
-      const { row, store, contract } = await loadAuthorizedContract(workspaceId, contractToken, writeToken);
+      const { row, store, contract } = await loadAuthorizedContract(workspaceId, contractToken, writeToken, fallbackContract);
       const now = new Date().toISOString();
       const snapshot = contract.snapshot || buildSnapshot(contract, store);
       const signature = {
@@ -99,7 +100,12 @@ Deno.serve(async (request) => {
   }
 });
 
-async function loadAuthorizedContract(workspaceId: string, contractToken: string, writeToken: string) {
+async function loadAuthorizedContract(
+  workspaceId: string,
+  contractToken: string,
+  writeToken: string,
+  fallbackContract?: Record<string, unknown>,
+) {
   if (!workspaceId || !contractToken || !writeToken) {
     throw new Error("签署链接缺少必要参数。");
   }
@@ -116,7 +122,11 @@ async function loadAuthorizedContract(workspaceId: string, contractToken: string
   }
 
   const store = normalizeStore(row.payload);
-  const contract = store.contracts.find((item: Record<string, unknown>) => item && item.token === contractToken);
+  let contract = store.contracts.find((item: Record<string, unknown>) => item && item.token === contractToken);
+
+  if (!contract && fallbackContract) {
+    contract = restoreFallbackContract(store, fallbackContract, contractToken, writeToken);
+  }
 
   if (!contract) {
     throw new Error("未找到对应的合同。");
@@ -154,6 +164,55 @@ function normalizeStore(payload: Record<string, unknown>) {
   const next = payload && typeof payload === "object" ? clone(payload) : {};
   next.contracts = Array.isArray(next.contracts) ? next.contracts : [];
   return next as { contracts: Array<Record<string, unknown>> };
+}
+
+function restoreFallbackContract(
+  store: { contracts: Array<Record<string, unknown>> },
+  fallbackContract: Record<string, unknown>,
+  contractToken: string,
+  writeToken: string,
+) {
+  const normalized = normalizeFallbackContract(fallbackContract, contractToken, writeToken);
+  if (!normalized) return null;
+  store.contracts.push(normalized);
+  return normalized;
+}
+
+function normalizeFallbackContract(
+  fallbackContract: Record<string, unknown>,
+  contractToken: string,
+  writeToken: string,
+) {
+  if (!fallbackContract || typeof fallbackContract !== "object") return null;
+  const token = String(fallbackContract.token || "").trim();
+  if (!token || token !== contractToken) return null;
+  const snapshot = fallbackContract.snapshot && typeof fallbackContract.snapshot === "object"
+    ? clone(fallbackContract.snapshot)
+    : null;
+  const fields = fallbackContract.fields && typeof fallbackContract.fields === "object"
+    ? clone(fallbackContract.fields)
+    : clone(snapshot?.fields || {});
+  const publishedAt = String(
+    fallbackContract.publishedAt
+      || snapshot?.publishedAt
+      || fallbackContract.updatedAt
+      || new Date().toISOString(),
+  );
+  return {
+    id: String(fallbackContract.id || `share-${crypto.randomUUID()}`),
+    status: String(fallbackContract.status || "published"),
+    token,
+    signWriteToken: writeToken,
+    fields,
+    snapshot,
+    signature: clone(fallbackContract.signature || snapshot?.signature || null),
+    confirmedAt: String(fallbackContract.confirmedAt || ""),
+    signedAt: String(fallbackContract.signedAt || ""),
+    publishedAt,
+    updatedAt: String(fallbackContract.updatedAt || fallbackContract.signedAt || publishedAt),
+    createdAt: String(fallbackContract.createdAt || publishedAt.slice(0, 10)),
+    audit: Array.isArray(fallbackContract.audit) ? clone(fallbackContract.audit) : [],
+  };
 }
 
 function buildSnapshot(contract: Record<string, unknown>, store: Record<string, unknown>) {
