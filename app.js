@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260425-signature-visibility-fix";
+  const BUILD_TAG = "20260425-short-share-link-fix";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -643,7 +643,7 @@
       status.textContent = signerRemoteLoading
         ? "正在加载线上合同..."
         : signerLinkWarning || "暂无可签署合同。请先由甲方发布合同，或打开乙方签署链接。";
-      preview.innerHTML = "";
+      preview.innerHTML = `<div class="status-note">${escapeHtml(status.textContent)}</div>`;
       meta.textContent = `${CONTRACT_TITLE} · 待发布`;
       signerNameInput.value = "";
     } else {
@@ -2386,16 +2386,15 @@
   }
 
   function buildSignLink(contract) {
-    const payload = encodeSignPayload(contract);
     if (hasAdminCloudConfig()) {
       contract.signWriteToken = contract.signWriteToken || randomToken(24);
       return `${getUrlBase()}?${buildQueryString({
         [SIGN_WORKSPACE_KEY]: supabaseConfig.workspaceId,
         [SIGN_CONTRACT_KEY]: contract.token,
         [SIGN_WRITE_KEY]: contract.signWriteToken,
-        [SIGN_PAYLOAD_KEY]: payload,
       })}`;
     }
+    const payload = encodeSignPayload(contract);
     return `${getUrlBase()}?${buildQueryString({
       [SIGN_HASH_KEY]: contract.token,
       [SIGN_PAYLOAD_KEY]: payload,
