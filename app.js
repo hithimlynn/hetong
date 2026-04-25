@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260425-signer-fix";
+  const BUILD_TAG = "20260425-merge-sync-fix";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -965,6 +965,7 @@
     }
     contract.status = "published";
     contract.publishedAt = nowIso();
+    contract.updatedAt = contract.publishedAt;
     contract.token = contract.token || randomToken(18);
     contract.signWriteToken = contract.signWriteToken || randomToken(24);
     contract.snapshot = {
@@ -991,6 +992,7 @@
     const contract = currentContract();
     if (!contract || !["published", "confirmed"].includes(contract.status)) return;
     contract.status = "revoked";
+    contract.updatedAt = nowIso();
     contract.audit.push(makeAudit("撤回合同", "乙方签署链接失效"));
     saveStore(true, { reason: "revoke-contract", immediate: true });
     renderAll();
@@ -1002,6 +1004,7 @@
     if (!contract || !checked || contract.status !== "published") return;
     contract.status = "confirmed";
     contract.confirmedAt = nowIso();
+    contract.updatedAt = contract.confirmedAt;
     contract.audit.push(makeAudit("乙方确认", "乙方勾选已确认合同内容无误"));
     if (signerWorkspaceId && signerToken) {
       renderAll();
@@ -1065,6 +1068,7 @@
     }
     contract.status = "signed";
     contract.signedAt = signature.signedAt;
+    contract.updatedAt = signature.signedAt;
     contract.signature = signature;
     syncSignedSignature(contract);
     contract.audit.push(makeAudit("乙方签署", `${signerName} 完成电子手写签名`));
@@ -1101,6 +1105,14 @@
     if (!contract) return;
     const ok = window.confirm(`确定删除合同「${contract.fields.brand || contract.fields.creatorName || "未命名合同"}」？`);
     if (!ok) return;
+    store.deletedContracts = normalizeDeletedContracts([
+      ...(Array.isArray(store.deletedContracts) ? store.deletedContracts : []),
+      {
+        id: contract.id,
+        token: contract.token,
+        deletedAt: nowIso(),
+      },
+    ]);
     store.contracts = store.contracts.filter((item) => item.id !== contractId);
     if (!store.contracts.length) {
       const next = makeContract();
@@ -1478,6 +1490,7 @@
     return {
       selectedId: contract.id,
       contracts: [contract],
+      deletedContracts: [],
       brandOptions: normalizeOptions([], DEFAULT_BRAND_OPTIONS, [contract.fields.brand]),
       platformOptions: normalizeOptions([], DEFAULT_PLATFORM_OPTIONS, [contract.fields.platform]),
       clauseVersions,
@@ -1491,6 +1504,7 @@
     const next = {
       selectedId: parsed.selectedId || "",
       contracts: parsed.contracts.map(normalizeContract),
+      deletedContracts: normalizeDeletedContracts(parsed.deletedContracts),
       brandOptions: normalizeOptions(
         parsed.brandOptions,
         Array.isArray(parsed.brandOptions) ? [] : DEFAULT_BRAND_OPTIONS,
@@ -1543,6 +1557,32 @@
       fields,
       snapshot,
       signature: contract.signature || getIn(snapshot, ["signature"]) || null,
+    };
+  }
+
+  function normalizeDeletedContracts(items) {
+    const map = new Map();
+    (Array.isArray(items) ? items : []).forEach((item) => {
+      const normalized = normalizeDeletedContract(item);
+      if (!normalized) return;
+      const key = deletedContractKey(normalized);
+      const existing = map.get(key);
+      if (!existing || deletedContractTimestamp(normalized) >= deletedContractTimestamp(existing)) {
+        map.set(key, normalized);
+      }
+    });
+    return Array.from(map.values());
+  }
+
+  function normalizeDeletedContract(item) {
+    if (!item || typeof item !== "object") return null;
+    const id = String(item.id || "").trim();
+    const token = String(item.token || "").trim();
+    if (!id && !token) return null;
+    return {
+      id,
+      token,
+      deletedAt: String(item.deletedAt || item.updatedAt || nowIso()),
     };
   }
 
@@ -2119,7 +2159,11 @@
   }
 
   async function upsertRemoteWorkspaceState(nextStore, reason) {
-    const payload = normalizeStoreState(clone(nextStore));
+    const localPayload = normalizeStoreState(clone(nextStore));
+    const remoteRow = await fetchRemoteWorkspaceState();
+    const payload = remoteRow && remoteRow.payload
+      ? mergeStoreStates(remoteRow.payload, localPayload)
+      : localPayload;
     const { error } = await withTimeout(
       supabaseClient
         .from(WORKSPACE_TABLE)
@@ -2146,6 +2190,59 @@
     saveStore(false, { skipRemote: true });
     applyingRemoteStore = false;
     renderAll();
+  }
+
+  function mergeStoreStates(remotePayload, localPayload) {
+    const remote = normalizeStoreState(clone(remotePayload));
+    const local = normalizeStoreState(clone(localPayload));
+    const deletedContracts = normalizeDeletedContracts([
+      ...remote.deletedContracts,
+      ...local.deletedContracts,
+    ]);
+    const tombstones = new Map(deletedContracts.map((item) => [deletedContractKey(item), item]));
+    const contractMap = new Map();
+    [...remote.contracts, ...local.contracts].forEach((item) => {
+      const contract = normalizeContract(item);
+      const key = contractIdentityKey(contract);
+      const existing = contractMap.get(key);
+      if (!existing || contractTimestamp(contract) >= contractTimestamp(existing)) {
+        contractMap.set(key, contract);
+      }
+    });
+    const contracts = Array.from(contractMap.values())
+      .filter((contract) => {
+        const tombstone = tombstones.get(contractIdentityKey(contract));
+        return !tombstone || contractTimestamp(contract) > deletedContractTimestamp(tombstone);
+      })
+      .sort((left, right) => contractTimestamp(right) - contractTimestamp(left));
+    const clauseVersions = mergeClauseVersions(remote.clauseVersions, local.clauseVersions);
+    const merged = {
+      selectedId: contracts.some((contract) => contract.id === local.selectedId)
+        ? local.selectedId
+        : contracts.some((contract) => contract.id === remote.selectedId)
+          ? remote.selectedId
+          : contracts[0] && contracts[0].id || "",
+      contracts,
+      deletedContracts,
+      brandOptions: normalizeOptions(
+        [...remote.brandOptions, ...local.brandOptions],
+        DEFAULT_BRAND_OPTIONS,
+        contracts.map((contract) => getIn(contract, ["fields", "brand"])),
+      ),
+      platformOptions: normalizeOptions(
+        [...remote.platformOptions, ...local.platformOptions],
+        DEFAULT_PLATFORM_OPTIONS,
+        contracts.map((contract) => getIn(contract, ["fields", "platform"])),
+      ),
+      clauseVersions,
+      activeClauseVersionId: resolveActiveClauseVersionId(
+        clauseVersions,
+        local.activeClauseVersionId,
+        remote.activeClauseVersionId,
+      ),
+      lastAppliedClauseSeed: CLAUSE_SEED_VERSION,
+    };
+    return normalizeStoreState(merged);
   }
 
   async function loadSignerContractFromCloud() {
@@ -2728,6 +2825,60 @@
         window.setTimeout(() => reject(new Error(message)), timeoutMs);
       }),
     ]);
+  }
+
+  function contractIdentityKey(contract) {
+    const token = String(contract && contract.token || "").trim();
+    if (token) return `token:${token}`;
+    return `id:${String(contract && contract.id || "").trim()}`;
+  }
+
+  function deletedContractKey(item) {
+    const token = String(item && item.token || "").trim();
+    if (token) return `token:${token}`;
+    return `id:${String(item && item.id || "").trim()}`;
+  }
+
+  function contractTimestamp(contract) {
+    return latestTimestamp([
+      contract && contract.updatedAt,
+      contract && contract.signedAt,
+      contract && contract.confirmedAt,
+      contract && contract.publishedAt,
+      contract && contract.createdAt,
+    ]);
+  }
+
+  function deletedContractTimestamp(item) {
+    return latestTimestamp([item && item.deletedAt]);
+  }
+
+  function latestTimestamp(values) {
+    let latest = 0;
+    (Array.isArray(values) ? values : []).forEach((value) => {
+      const time = Date.parse(String(value || ""));
+      if (Number.isFinite(time) && time > latest) latest = time;
+    });
+    return latest;
+  }
+
+  function mergeClauseVersions(remoteVersions, localVersions) {
+    const map = new Map();
+    [...normalizeClauseVersions(remoteVersions), ...normalizeClauseVersions(localVersions)].forEach((version) => {
+      const existing = map.get(version.id);
+      const nextTime = latestTimestamp([version.updatedAt]);
+      const currentTime = existing ? latestTimestamp([existing.updatedAt]) : -1;
+      if (!existing || nextTime >= currentTime) {
+        map.set(version.id, version);
+      }
+    });
+    return Array.from(map.values());
+  }
+
+  function resolveActiveClauseVersionId(versions, preferredId, fallbackId) {
+    if (versions.some((version) => version.id === preferredId)) return preferredId;
+    if (versions.some((version) => version.id === fallbackId)) return fallbackId;
+    return versions[versions.length - 1] && versions[versions.length - 1].id || "";
   }
 
   function getUrlBase() {
