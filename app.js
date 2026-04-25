@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260425-short-share-link-fix";
+  const BUILD_TAG = "20260425-signer-network-fix";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -14,6 +14,8 @@
   const REMOTE_SYNC_DEBOUNCE_MS = 900;
   const REMOTE_POLL_INTERVAL_MS = 4000;
   const REMOTE_REQUEST_TIMEOUT_MS = 8000;
+  const SIGNER_LOAD_TIMEOUT_MS = 15000;
+  const SIGNER_LOAD_RETRY_DELAY_MS = 1000;
   const REMOTE_SAVE_RETRY_LIMIT = 3;
   const CONTRACT_TITLE = "达人内容发布合作协议";
   const CLAUSE_SEED_VERSION = "wlead-pdf-2026-04-24";
@@ -2294,11 +2296,8 @@
     signerRemoteLoading = true;
     signerLinkWarning = "正在加载线上合同...";
     renderAll();
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("线上合同加载超时，请检查网络连接。")), 8000)
-    );
     try {
-      const remoteContract = await Promise.race([fetchSignerContractFromCloud(), timeoutPromise]);
+      const remoteContract = await fetchSignerContractWithRetry();
       signerPayloadContract = normalizeContract(remoteContract);
       signerLinkWarning = "";
       signerRemoteLoading = false;
@@ -2317,6 +2316,30 @@
       throw new Error("未找到对应的线上合同。");
     }
     return response.contract;
+  }
+
+  async function fetchSignerContractWithTimeout() {
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("线上合同加载超时，请检查网络连接。")), SIGNER_LOAD_TIMEOUT_MS)
+    );
+    return Promise.race([fetchSignerContractFromCloud(), timeoutPromise]);
+  }
+
+  async function fetchSignerContractWithRetry() {
+    try {
+      return await fetchSignerContractWithTimeout();
+    } catch (error) {
+      if (!isRetryableSignerLoadError(error)) throw error;
+      signerLinkWarning = "线上合同加载较慢，正在重试...";
+      renderAll();
+      await wait(SIGNER_LOAD_RETRY_DELAY_MS);
+      return fetchSignerContractWithTimeout();
+    }
+  }
+
+  function isRetryableSignerLoadError(error) {
+    const message = error && error.message ? String(error.message) : "";
+    return /timeout|Failed to fetch|ERR_FAILED|ERR_CONNECTION_CLOSED/i.test(message);
   }
 
   async function submitRemoteSignature(payload) {
@@ -2346,18 +2369,16 @@
         [SIGN_WRITE_KEY]: signerWriteToken,
       })}`
       : buildSupabaseFunctionUrl();
-    const headers = {
-      apikey: supabaseConfig.anonKey,
-      Authorization: `Bearer ${supabaseConfig.anonKey}`,
-      Accept: "application/json",
-    };
-    if (method === "POST") {
-      headers["Content-Type"] = "application/json";
-    }
     const response = await fetch(url, {
       method,
-      headers,
-      ...(method === "POST" ? { body: JSON.stringify(body) } : {}),
+      ...(method === "POST"
+        ? {
+            headers: {
+              "Content-Type": "text/plain;charset=UTF-8",
+            },
+            body: JSON.stringify(body || {}),
+          }
+        : {}),
     });
     const text = await response.text();
     let data = null;
@@ -2380,9 +2401,21 @@
     const message = error && error.message ? String(error.message) : "";
     if (!message) return fallbackMessage;
     if (/Invalid login credentials/i.test(message)) return "密码错误，请重新输入。";
-    if (/Failed to fetch/i.test(message)) return "网络连接失败，请检查 Supabase 地址或当前网络。";
-    if (/JWT|permission|not allowed/i.test(message)) return "当前云端权限不足，请检查 Supabase 配置。";
+    if (/timeout/i.test(message)) return "线上合同加载超时，请稍后重试或改用系统浏览器打开。";
+    if (/workspace|contract|未找到对应的合同|未找到对应的合同工作区/i.test(message)) {
+      return "签署链接已失效或合同未同步，请联系甲方重新发布。";
+    }
+    if (/Failed to fetch|ERR_FAILED|ERR_CONNECTION_CLOSED/i.test(message)) {
+      return "当前网络或浏览器拦截了线上请求，请尝试系统浏览器打开。";
+    }
+    if (/JWT|permission|not allowed|Forbidden|权限无效/i.test(message)) {
+      return "签署链接已失效，请联系甲方重新发布。";
+    }
     return message;
+  }
+
+  function wait(durationMs) {
+    return new Promise((resolve) => setTimeout(resolve, durationMs));
   }
 
   function buildSignLink(contract) {

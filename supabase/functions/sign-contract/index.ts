@@ -33,7 +33,7 @@ Deno.serve(async (request) => {
     }
 
     if (request.method === "POST") {
-      const payload = await request.json();
+      const payload = await readPayload(request);
       const workspaceId = String(payload.ws || "").trim();
       const contractToken = String(payload.ct || "").trim();
       const writeToken = String(payload.wt || "").trim();
@@ -145,6 +145,29 @@ async function loadAuthorizedContract(
   return { row, store, contract };
 }
 
+async function readPayload(request: Request) {
+  const contentType = String(request.headers.get("content-type") || "").toLowerCase();
+  if (contentType.includes("application/json")) {
+    return await request.json();
+  }
+
+  const raw = await request.text();
+  if (!raw) return {};
+
+  const trimmed = raw.trim();
+  if (!trimmed) return {};
+
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    return JSON.parse(trimmed);
+  }
+
+  const params = new URLSearchParams(trimmed);
+  const payload: Record<string, unknown> = {};
+  for (const [key, value] of params.entries()) {
+    payload[key] = value;
+  }
+  return payload;
+}
 function sanitizeContract(contract: Record<string, unknown>) {
   return {
     id: contract.id,
