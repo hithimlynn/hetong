@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260427-signer-domain-links";
+  const BUILD_TAG = "20260427-signer-submit-stability";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -16,6 +16,7 @@
   const REMOTE_REQUEST_TIMEOUT_MS = 8000;
   const SIGNER_LOAD_TIMEOUT_MS = 15000;
   const SIGNER_LOAD_RETRY_DELAY_MS = 1000;
+  const SIGNER_LOAD_CACHE_MS = 10000;
   const REMOTE_SAVE_RETRY_LIMIT = 3;
   const CONTRACT_TITLE = "达人内容发布合作协议";
   const CLAUSE_SEED_VERSION = "wlead-pdf-2026-04-24";
@@ -198,6 +199,11 @@
   let signerPayloadContract = null;
   let signerLinkWarning = "";
   let signerRemoteLoading = false;
+  let signerSubmitInProgress = false;
+  let signerLoadPromise = null;
+  let signerLoadKey = "";
+  let signerLastLoadedKey = "";
+  let signerLastLoadedAt = 0;
   let signatureDirty = false;
   let signerUploadData = "";
   let signerUploadName = "";
@@ -643,7 +649,7 @@
     const signerNameInput = document.getElementById("signerName");
     const confirmCheckbox = document.getElementById("confirmCheckbox");
     const signerUpload = document.getElementById("signerUpload");
-    const canSign = contract && ["published", "confirmed"].includes(contract.status);
+    const canSign = contract && ["published", "confirmed"].includes(contract.status) && !signerSubmitInProgress;
     if (!contract) {
       status.textContent = signerRemoteLoading
         ? "正在加载线上合同..."
@@ -1028,6 +1034,7 @@
   }
 
   async function submitSignature() {
+    if (signerSubmitInProgress) return;
     const contract = signerContract();
     const signerName = document.getElementById("signerName").value.trim();
     const confirmed = document.getElementById("confirmCheckbox").checked;
@@ -1059,8 +1066,11 @@
     signature.snapshotHash = await makeSnapshotHash(contract.snapshot || { fields: contract.fields, clauses: clone(activeClauseVersion().sections) }, signature);
     if (signerWorkspaceId && signerToken) {
       try {
+        signerSubmitInProgress = true;
         signerRemoteLoading = true;
+        showSignMessage("正在提交签署，请稍候...", "ok");
         renderTopState();
+        renderSigner();
         const remoteContract = await submitRemoteSignature({
           signerName,
           imageData: signatureImage,
@@ -1069,13 +1079,16 @@
         signerPayloadContract = normalizeContract(remoteContract);
         signerPayloadContract.signature = clone(remoteContract.signature || signerPayloadContract.signature);
         mergeRemoteContractIntoLocalStore(signerPayloadContract);
+        await loadSignerContractFromCloud({ force: true });
         signerRemoteLoading = false;
+        signerSubmitInProgress = false;
         showSignMessage("签署已完成，已直接同步给甲方。", "ok");
         renderAll();
       } catch (error) {
         signerRemoteLoading = false;
+        signerSubmitInProgress = false;
         showSignMessage(friendlyCloudError(error, "线上签署提交失败，请稍后重试。"));
-        renderTopState();
+        renderAll();
       }
       return;
     }
@@ -2335,28 +2348,50 @@
     return normalizeStoreState(merged);
   }
 
-  async function loadSignerContractFromCloud() {
-    if (!signerWorkspaceId || !signerToken) return;
+  async function loadSignerContractFromCloud(options = {}) {
+    if (!signerWorkspaceId || !signerToken) return null;
     if (!hasSupabaseClientConfig()) {
-      signerLinkWarning = "当前页面尚未配置 Supabase，无法读取线上合同。";
+      signerLinkWarning = "Supabase is not configured. The online contract cannot be loaded.";
       renderAll();
-      return;
+      return null;
     }
+    const key = currentSignerRequestKey();
+    const now = Date.now();
+    if (!options.force && signerPayloadContract && signerLastLoadedKey === key && now - signerLastLoadedAt < SIGNER_LOAD_CACHE_MS) {
+      return signerPayloadContract;
+    }
+    if (!options.force && signerLoadPromise && signerLoadKey === key) {
+      return signerLoadPromise;
+    }
+    signerLoadKey = key;
     signerRemoteLoading = true;
-    signerLinkWarning = "正在加载线上合同...";
+    signerLinkWarning = "Loading online contract...";
     renderAll();
-    try {
-      const remoteContract = await fetchSignerContractWithRetry();
-      signerPayloadContract = normalizeContract(remoteContract);
-      signerLinkWarning = "";
-      signerRemoteLoading = false;
-      mergeRemoteContractIntoLocalStore(signerPayloadContract);
-      renderAll();
-    } catch (error) {
-      signerRemoteLoading = false;
-      signerLinkWarning = friendlyCloudError(error, "线上合同加载失败，请检查网络连接或联系甲方重新发布。");
-      renderAll();
-    }
+    signerLoadPromise = (async () => {
+      try {
+        const remoteContract = await fetchSignerContractWithRetry();
+        signerPayloadContract = normalizeContract(remoteContract);
+        signerLastLoadedKey = key;
+        signerLastLoadedAt = Date.now();
+        signerLinkWarning = "";
+        mergeRemoteContractIntoLocalStore(signerPayloadContract);
+        return signerPayloadContract;
+      } catch (error) {
+        signerLinkWarning = friendlyCloudError(error, "Online contract failed to load. Please check the network or ask party A to publish again.");
+        throw error;
+      } finally {
+        signerRemoteLoading = false;
+        if (signerLoadKey === key) {
+          signerLoadPromise = null;
+        }
+        renderAll();
+      }
+    })();
+    return signerLoadPromise;
+  }
+
+  function currentSignerRequestKey() {
+    return [signerWorkspaceId || "", signerToken || "", signerWriteToken || ""].join("|");
   }
 
   async function fetchSignerContractFromCloud() {
@@ -2413,43 +2448,11 @@
       [SIGN_CONTRACT_KEY]: signerToken,
       [SIGN_WRITE_KEY]: signerWriteToken,
     }, body);
-    if (!hasSupabaseClientConfig()) {
-      throw new Error("Supabase 尚未配置。");
-    }
-    const url = method === "GET"
-      ? `${buildSupabaseFunctionUrl()}?${buildQueryString({
-        [SIGN_WORKSPACE_KEY]: signerWorkspaceId,
-        [SIGN_CONTRACT_KEY]: signerToken,
-        [SIGN_WRITE_KEY]: signerWriteToken,
-      })}`
-      : buildSupabaseFunctionUrl();
-    const response = await fetch(url, {
-      method,
-      ...(method === "POST"
-        ? {
-            headers: {
-              "Content-Type": "text/plain;charset=UTF-8",
-            },
-            body: JSON.stringify(body || {}),
-          }
-        : {}),
-    });
-    const text = await response.text();
-    let data = null;
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch (error) {
-      data = { error: text || "线上签署服务响应异常。" };
-    }
-    if (!response.ok) {
-      throw new Error(data && data.error ? data.error : "线上签署服务请求失败。");
-    }
-    return data;
   }
 
   async function callSignerFunctionForParams(method, params, body) {
     if (!hasSupabaseClientConfig()) {
-      throw new Error("Supabase 灏氭湭閰嶇疆銆?");
+      throw new Error("Supabase is not configured.");
     }
     const url = method === "GET"
       ? `${buildSupabaseFunctionUrl()}?${buildQueryString(params || {})}`
@@ -2466,16 +2469,32 @@
         : {}),
     });
     const text = await response.text();
-    let data = null;
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch (error) {
-      data = { error: text || "绾夸笂绛剧讲鏈嶅姟鍝嶅簲寮傚父銆?" };
-    }
+    const data = parseSignerResponse(text);
     if (!response.ok) {
-      throw new Error(data && data.error ? data.error : "绾夸笂绛剧讲鏈嶅姟璇锋眰澶辫触銆?");
+      throw new Error(normalizeSignerError(data, text));
     }
     return data;
+  }
+
+  function parseSignerResponse(text) {
+    try {
+      return text ? JSON.parse(text) : {};
+    } catch (error) {
+      return { error: summarizeResponseText(text) };
+    }
+  }
+
+  function normalizeSignerError(data, rawText) {
+    const message = data && data.error ? String(data.error) : summarizeResponseText(rawText);
+    if (/Internal Server Error/i.test(message)) return "Signer service is temporarily unavailable. Please retry.";
+    if (/timeout|timed out/i.test(message)) return "Signer submission timed out. Please retry.";
+    if (/Forbidden|invalid|expired|permission|not allowed/i.test(message)) return "Signer link is invalid. Please ask party A to publish again.";
+    return message || "Signer service request failed. Please retry.";
+  }
+
+  function summarizeResponseText(text) {
+    const clean = String(text || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    return clean.slice(0, 160) || "Signer service response was invalid.";
   }
 
   function buildSupabaseFunctionUrl() {
