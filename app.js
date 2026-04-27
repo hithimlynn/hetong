@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260427-android-signature-white";
+  const BUILD_TAG = "20260427-settlement-clause";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -19,8 +19,8 @@
   const SIGNER_LOAD_CACHE_MS = 10000;
   const REMOTE_SAVE_RETRY_LIMIT = 3;
   const CONTRACT_TITLE = "达人内容发布合作协议";
-  const CLAUSE_SEED_VERSION = "wlead-pdf-2026-04-24";
-  const CLAUSE_SEED_LABEL = "PDF基准 V2026.04.24";
+  const CLAUSE_SEED_VERSION = "wlead-pdf-2026-04-27-settlement";
+  const CLAUSE_SEED_LABEL = "PDF基准 V2026.04.27";
   const DEFAULT_BRAND_OPTIONS = ["Wlead"];
   const DEFAULT_PLATFORM_OPTIONS = ["小红书", "抖音", "bilibili", "公众号"];
   const INSTANCE_ID = randomToken(8);
@@ -132,7 +132,7 @@
         "1、甲方权利义务",
         "（1）本次合作内容制作具体要求，甲方应按照约定时间及时以书面形式发送给乙方，并保证各项内容要求符合相关法规，内容制作过程中为更高效完成创作，相应修改应及时总结告知乙方，且修改次数为（两次）",
         "（2）对本次发布推广的内容，甲方可无偿进行再剪辑，相关内容甲方或甲方关联主体可在抖音、",
-        "（3）甲方对本次合作费用有保密义务,所有达人发布后（14）天结算所有费用",
+        "（3）甲方对本次合作费用有保密义务,所有达人发布后15~20个工作日内结算所有费用",
         "2、乙方权利义务",
         "（1）在内容制作完成后乙方应将相关内容成稿以及原素材发送给甲方。",
         "（2）若甲方内容制作要求有违反国家政策法规，乙方有权拒绝代理发布。",
