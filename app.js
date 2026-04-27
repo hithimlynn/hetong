@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260427-clause-template-library";
+  const BUILD_TAG = "20260427-watermark-geometry-lock";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -863,7 +863,9 @@ function renderClauses() {
   function renderContractPageShell(watermark, content) {
     return `
       <section class="contract-page">
-        <div class="contract-watermark" aria-hidden="true">${escapeHtml(watermark)}</div>
+        <div class="contract-watermark-layer" aria-hidden="true">
+          <img class="contract-watermark-image" src="${escapeAttr(buildContractWatermarkSvg(watermark))}" alt="" />
+        </div>
         <div class="contract-page-content">${content}</div>
       </section>
     `;
@@ -1895,6 +1897,35 @@ function renderClauses() {
     if (letters) return letters;
     if (text) return text;
     return "BRAND";
+  }
+
+  function buildContractWatermarkSvg(text) {
+    const value = escapeSvgText(String(text || "BRAND").trim() || "BRAND");
+    const charCount = Array.from(value).length || 1;
+    const fontSize = charCount <= 5 ? 238 : charCount <= 8 ? 214 : charCount <= 12 ? 186 : 164;
+    const textLength = charCount <= 4 ? 600 : charCount <= 8 ? 730 : charCount <= 12 ? 820 : 900;
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1600" preserveAspectRatio="xMidYMid meet">
+        <rect width="100%" height="100%" fill="none"/>
+        <g transform="translate(600 800) rotate(-30)">
+          <text
+            x="0"
+            y="0"
+            text-anchor="middle"
+            dominant-baseline="middle"
+            font-family="SimSun, serif"
+            font-size="${fontSize}"
+            font-weight="700"
+            letter-spacing="8"
+            fill="rgb(80,80,80)"
+            fill-opacity="0.2"
+            textLength="${textLength}"
+            lengthAdjust="spacingAndGlyphs"
+          >${value}</text>
+        </g>
+      </svg>
+    `.trim().replace(/\s*\n\s*/g, " ");
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
   }
 
   function currentDraftContract() {

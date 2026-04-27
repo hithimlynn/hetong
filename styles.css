@@ -782,27 +782,25 @@ textarea:disabled {
   z-index: 1;
 }
 
-.contract-watermark {
+.contract-watermark-layer {
   position: absolute;
-  inset: 0;
+  inset: 18mm 25mm;
   z-index: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 92%;
-  margin: auto;
   pointer-events: none;
   user-select: none;
-  font-family: SimSun, "Songti SC", serif;
-  font-size: clamp(72px, 18vw, 180px);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0.12em;
-  white-space: nowrap;
-  text-align: center;
-  color: rgba(80, 80, 80, 0.2);
-  transform: rotate(-30deg) scale(1.15);
-  transform-origin: center;
+}
+
+.contract-watermark-image {
+  display: block;
+  width: 150mm;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  object-position: center;
+  opacity: 1;
 }
 
 .doc-header {
@@ -1205,11 +1203,13 @@ body.exporting-pdf .contract-page {
     line-height: 1.58;
   }
 
-  .contract-watermark {
-    width: 94%;
-    font-size: clamp(54px, 20vw, 110px);
-    letter-spacing: 0.08em;
-    transform: rotate(-30deg) scale(1.05);
+  .contract-watermark-layer {
+    inset: 18px 14px;
+  }
+
+  .contract-watermark-image {
+    width: 84%;
+    max-width: 420px;
   }
 
   .doc-title {
@@ -1414,11 +1414,21 @@ body.exporting-pdf .contract-page {
     box-shadow: none;
   }
 
-  #printRoot .contract-watermark {
-    width: 92%;
-    font-size: 44mm;
-    letter-spacing: 0.14em;
-    color: rgba(80, 80, 80, 0.2);
-    transform: rotate(-30deg) scale(1.08);
+  #printRoot .contract-watermark-layer {
+    position: fixed;
+    inset: auto;
+    top: 18mm;
+    left: 25mm;
+    width: 160mm;
+    height: 261mm;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  #printRoot .contract-watermark-image {
+    width: 150mm;
+    max-width: none;
   }
 }
