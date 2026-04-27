@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260427-sign-domain-live";
+  const BUILD_TAG = "20260427-share-link-validation-fix";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -221,6 +221,7 @@
     lastPulledAt: "",
     lastPushedAt: "",
   };
+  const shareLinkState = Object.create(null);
 
   init();
 
@@ -627,7 +628,8 @@
     const shareBox = document.getElementById("shareBox");
     if (["published", "confirmed", "signed"].includes(contract.status)) {
       shareBox.hidden = false;
-      document.getElementById("shareLink").value = buildSignLink(contract);
+      renderShareLink(contract);
+      if (hasAdminCloudConfig()) queueShareLinkValidation(contract);
     } else {
       shareBox.hidden = true;
     }
@@ -987,6 +989,13 @@
       const synced = await flushRemoteStore("publish-contract");
       if (!synced) {
         showValidation(["Cloud sync failed after publish. Please retry before sending the signer link."]);
+        renderAll();
+        return;
+      }
+      try {
+        await ensureValidShareLink(contract, { forceValidate: true });
+      } catch (error) {
+        showValidation([friendlyCloudError(error, "签署链接校验失败，请稍后重试。")]);
       }
     }
     renderAll();
@@ -1143,8 +1152,19 @@
   }
 
   async function copyShareLink() {
+    const contract = currentContract();
+    if (!contract) return;
     const input = document.getElementById("shareLink");
-    const value = input.value;
+    let value = input.value;
+    if (hasAdminCloudConfig() && ["published", "confirmed", "signed"].includes(contract.status)) {
+      try {
+        value = await ensureValidShareLink(contract, { forceValidate: true });
+        renderShareLink(findContractByIdentity(contract) || contract);
+      } catch (error) {
+        showValidation([friendlyCloudError(error, "签署链接校验失败，请稍后重试。")]);
+        return;
+      }
+    }
     if (!value) return;
     const copied = await copyTextToClipboard(value, input);
     document.getElementById("syncState").textContent = copied ? "签署链接已复制" : "请长按链接手动复制";
@@ -1753,6 +1773,16 @@
 
   function currentContract() {
     return store.contracts.find((contract) => contract.id === store.selectedId) || store.contracts[0] || null;
+  }
+
+  function findContractByIdentity(contractLike) {
+    if (!contractLike) return null;
+    const matchId = String(contractLike.id || "").trim();
+    const matchToken = String(contractLike.token || "").trim();
+    return store.contracts.find((contract) => (
+      (matchId && String(contract.id || "").trim() === matchId)
+      || (matchToken && String(contract.token || "").trim() === matchToken)
+    )) || null;
   }
 
   function signerContract() {
@@ -2373,6 +2403,11 @@
   }
 
   async function callSignerFunction(method, body) {
+    return callSignerFunctionForParams(method, {
+      [SIGN_WORKSPACE_KEY]: signerWorkspaceId,
+      [SIGN_CONTRACT_KEY]: signerToken,
+      [SIGN_WRITE_KEY]: signerWriteToken,
+    }, body);
     if (!hasSupabaseClientConfig()) {
       throw new Error("Supabase 尚未配置。");
     }
@@ -2403,6 +2438,37 @@
     }
     if (!response.ok) {
       throw new Error(data && data.error ? data.error : "线上签署服务请求失败。");
+    }
+    return data;
+  }
+
+  async function callSignerFunctionForParams(method, params, body) {
+    if (!hasSupabaseClientConfig()) {
+      throw new Error("Supabase 灏氭湭閰嶇疆銆?");
+    }
+    const url = method === "GET"
+      ? `${buildSupabaseFunctionUrl()}?${buildQueryString(params || {})}`
+      : buildSupabaseFunctionUrl();
+    const response = await fetch(url, {
+      method,
+      ...(method === "POST"
+        ? {
+            headers: {
+              "Content-Type": "text/plain;charset=UTF-8",
+            },
+            body: JSON.stringify(body || {}),
+          }
+        : {}),
+    });
+    const text = await response.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (error) {
+      data = { error: text || "绾夸笂绛剧讲鏈嶅姟鍝嶅簲寮傚父銆?" };
+    }
+    if (!response.ok) {
+      throw new Error(data && data.error ? data.error : "绾夸笂绛剧讲鏈嶅姟璇锋眰澶辫触銆?");
     }
     return data;
   }
@@ -2449,6 +2515,144 @@
       [SIGN_HASH_KEY]: contract.token,
       [SIGN_PAYLOAD_KEY]: payload,
     })}`;
+  }
+
+  function shareLinkStateKey(contract) {
+    return contractIdentityKey(contract);
+  }
+
+  function getShareLinkState(contract) {
+    if (!contract) return null;
+    const key = shareLinkStateKey(contract);
+    if (!shareLinkState[key]) {
+      shareLinkState[key] = {
+        link: "",
+        checkedWt: "",
+        validating: false,
+        error: "",
+        promise: null,
+      };
+    }
+    return shareLinkState[key];
+  }
+
+  function renderShareLink(contract) {
+    const input = document.getElementById("shareLink");
+    const copyButton = document.getElementById("copyLinkBtn");
+    if (!contract) {
+      input.value = "";
+      input.placeholder = "";
+      copyButton.disabled = true;
+      return;
+    }
+    if (!hasAdminCloudConfig()) {
+      input.value = buildSignLink(contract);
+      input.placeholder = "";
+      copyButton.disabled = !input.value;
+      return;
+    }
+    const state = getShareLinkState(contract);
+    const sameToken = state.checkedWt && state.checkedWt === contract.signWriteToken;
+    input.value = sameToken ? state.link : "";
+    input.placeholder = state.validating
+      ? "正在校验签署链接..."
+      : (state.error || "正在准备签署链接...");
+    copyButton.disabled = state.validating || !input.value;
+  }
+
+  function queueShareLinkValidation(contract, options = {}) {
+    if (!contract || !hasAdminCloudConfig()) return Promise.resolve("");
+    if (!["published", "confirmed", "signed"].includes(contract.status)) return Promise.resolve("");
+    const state = getShareLinkState(contract);
+    if (state.promise) return state.promise;
+    if (!options.forceValidate) {
+      if (state.link && state.checkedWt === contract.signWriteToken) return Promise.resolve(state.link);
+      if (!state.link && state.error && state.checkedWt === contract.signWriteToken) return Promise.resolve("");
+    }
+    return ensureValidShareLink(contract, options).catch(() => "");
+  }
+
+  async function ensureValidShareLink(contract, options = {}) {
+    if (!contract) return "";
+    if (!hasAdminCloudConfig()) return buildSignLink(contract);
+    const state = getShareLinkState(contract);
+    if (state.promise) return state.promise;
+    if (!options.forceValidate && state.link && state.checkedWt === contract.signWriteToken) {
+      return state.link;
+    }
+    state.validating = true;
+    state.error = "";
+    const current = currentContract();
+    if (current && shareLinkStateKey(current) === shareLinkStateKey(contract)) {
+      renderShareLink(current);
+    }
+    const key = shareLinkStateKey(contract);
+    state.promise = (async () => {
+      let target = findContractByIdentity(contract) || contract;
+      try {
+        const validLink = await verifyShareLink(target);
+        state.link = validLink;
+        state.checkedWt = target.signWriteToken;
+        state.error = "";
+        return validLink;
+      } catch (error) {
+        if (isInvalidShareLinkError(error)) {
+          target = await refreshShareLinkToken(target);
+          const refreshedLink = await verifyShareLink(target);
+          state.link = refreshedLink;
+          state.checkedWt = target.signWriteToken;
+          state.error = "";
+          document.getElementById("syncState").textContent = "签署链接已自动刷新";
+          return refreshedLink;
+        }
+        state.link = "";
+        state.checkedWt = target.signWriteToken;
+        state.error = friendlyCloudError(error, "签署链接校验失败，请稍后重试。");
+        throw error;
+      } finally {
+        const finalState = shareLinkState[key];
+        if (finalState) {
+          finalState.validating = false;
+          finalState.promise = null;
+        }
+        const visible = currentContract();
+        if (visible && shareLinkStateKey(visible) === key) {
+          renderShareLink(visible);
+        }
+      }
+    })();
+    return state.promise;
+  }
+
+  async function verifyShareLink(contract) {
+    const target = findContractByIdentity(contract) || contract;
+    if (!target || !target.token || !target.signWriteToken) {
+      throw new Error("当前合同缺少有效的签署链接参数。");
+    }
+    await callSignerFunctionForParams("GET", {
+      [SIGN_WORKSPACE_KEY]: supabaseConfig.workspaceId,
+      [SIGN_CONTRACT_KEY]: target.token,
+      [SIGN_WRITE_KEY]: target.signWriteToken,
+    });
+    return buildSignLink(target);
+  }
+
+  async function refreshShareLinkToken(contract) {
+    const target = findContractByIdentity(contract) || contract;
+    if (!target) throw new Error("未找到需要刷新的合同。");
+    target.signWriteToken = randomToken(24);
+    target.updatedAt = nowIso();
+    saveStore(true, { reason: "refresh-sign-link", skipRemote: true });
+    const synced = await flushRemoteStore("refresh-sign-link");
+    if (!synced) {
+      throw new Error("签署链接刷新后云端保存失败，请稍后重试。");
+    }
+    return findContractByIdentity(target) || target;
+  }
+
+  function isInvalidShareLinkError(error) {
+    const message = error && error.message ? String(error.message) : "";
+    return /签署链接已失效|权限无效|未找到对应的合同|未找到对应的合同工作区|Forbidden|not allowed/i.test(message);
   }
 
   function encodeSignPayload(contract) {
