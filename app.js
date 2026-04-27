@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260427-brand-watermark";
+  const BUILD_TAG = "20260427-watermark-sync";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -409,13 +409,15 @@
 
   function renderForm() {
     const contract = currentContract();
-    const form = document.getElementById("contractForm");
     if (!contract) {
       document.getElementById("contractPreview").innerHTML = "";
       return;
     }
-    document.getElementById("contractPreview").innerHTML = renderEditableContractDocument(contract);
-    setupPartyASignatureCanvas();
+    const isDraft = contract.status === "draft";
+    document.getElementById("contractPreview").innerHTML = isDraft
+      ? renderEditableContractDocument(contract)
+      : renderContractDocument(contract);
+    if (isDraft) setupPartyASignatureCanvas();
   }
 
   function renderField(contract, field, locked) {
@@ -627,8 +629,11 @@
     const status = STATUS[contract.status] || STATUS.draft;
     document.getElementById("previewMeta").textContent = `${status.label} · ${contract.fields.brand || "未命名合同"}`;
     if (getClosest(document.activeElement, "#contractForm")) return;
-    document.getElementById("contractPreview").innerHTML = renderEditableContractDocument(contract);
-    setupPartyASignatureCanvas();
+    const isDraft = contract.status === "draft";
+    document.getElementById("contractPreview").innerHTML = isDraft
+      ? renderEditableContractDocument(contract)
+      : renderContractDocument(contract);
+    if (isDraft) setupPartyASignatureCanvas();
     document.getElementById("publishBtn").disabled = contract.status !== "draft";
     document.getElementById("revokeBtn").disabled = !["published", "confirmed"].includes(contract.status);
     const shareBox = document.getElementById("shareBox");
