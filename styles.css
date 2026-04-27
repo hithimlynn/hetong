@@ -899,15 +899,27 @@ textarea:disabled {
   aspect-ratio: 3 / 1;
   border: 1px dashed var(--line-strong);
   border-radius: 6px;
-  background: #fff;
+  background: #fff !important;
   overflow: hidden;
+  color-scheme: only light;
+  forced-color-adjust: none;
+  overscroll-behavior: contain;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 #signatureCanvas {
   display: block;
   width: 100%;
   height: 100%;
+  background: #fff !important;
   touch-action: none;
+  color-scheme: only light;
+  forced-color-adjust: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .status-note {
@@ -1221,6 +1233,10 @@ body.exporting-pdf .contract-page {
       linear-gradient(transparent calc(100% - 1px), #eef2f7 1px),
       #fff;
     background-size: 100% 42px;
+  }
+
+  #signatureCanvas {
+    background: #fff !important;
   }
 
   .signer-upload-preview {

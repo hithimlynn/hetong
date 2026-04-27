@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260427-signer-submit-stability";
+  const BUILD_TAG = "20260427-android-signature-white";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -1326,6 +1326,11 @@
     const context = canvas.getContext("2d");
     let drawing = false;
 
+    function paintBackground(rect) {
+      context.fillStyle = "#fff";
+      context.fillRect(0, 0, rect.width, rect.height);
+    }
+
     function resize() {
       const rect = canvas.getBoundingClientRect();
       if (!rect.width || !rect.height) {
@@ -1341,6 +1346,7 @@
       context.lineJoin = "round";
       context.lineWidth = 2.2;
       context.strokeStyle = "#111";
+      paintBackground(rect);
       if (previous) {
         const image = new Image();
         image.onload = () => context.drawImage(image, 0, 0, rect.width, rect.height);
@@ -1357,9 +1363,14 @@
     canvas.addEventListener("pointerdown", (event) => {
       const contract = signerContract();
       if (!contract || !["published", "confirmed"].includes(contract.status)) return;
+      event.preventDefault();
       if (!canvasReady) resize();
       drawing = true;
-      canvas.setPointerCapture(event.pointerId);
+      try {
+        canvas.setPointerCapture(event.pointerId);
+      } catch (error) {
+        // Some Android WebViews do not support pointer capture reliably.
+      }
       const p = point(event);
       context.beginPath();
       context.moveTo(p.x, p.y);
@@ -1368,12 +1379,14 @@
 
     canvas.addEventListener("pointermove", (event) => {
       if (!drawing) return;
+      event.preventDefault();
       const p = point(event);
       context.lineTo(p.x, p.y);
       context.stroke();
     });
 
     canvas.addEventListener("pointerup", (event) => {
+      event.preventDefault();
       drawing = false;
       try {
         canvas.releasePointerCapture(event.pointerId);
@@ -1382,9 +1395,52 @@
       }
     });
 
+    canvas.addEventListener("pointercancel", () => {
+      drawing = false;
+    });
+
+    canvas.addEventListener("lostpointercapture", () => {
+      drawing = false;
+    });
+
     canvas.addEventListener("pointerleave", () => {
       drawing = false;
     });
+
+    if (!window.PointerEvent) {
+      canvas.addEventListener("touchstart", (event) => {
+        const contract = signerContract();
+        if (!contract || !["published", "confirmed"].includes(contract.status)) return;
+        const touch = event.touches[0];
+        if (!touch) return;
+        event.preventDefault();
+        if (!canvasReady) resize();
+        drawing = true;
+        const p = point(touch);
+        context.beginPath();
+        context.moveTo(p.x, p.y);
+        signatureDirty = true;
+      }, { passive: false });
+
+      canvas.addEventListener("touchmove", (event) => {
+        if (!drawing) return;
+        const touch = event.touches[0];
+        if (!touch) return;
+        event.preventDefault();
+        const p = point(touch);
+        context.lineTo(p.x, p.y);
+        context.stroke();
+      }, { passive: false });
+
+      canvas.addEventListener("touchend", (event) => {
+        event.preventDefault();
+        drawing = false;
+      }, { passive: false });
+
+      canvas.addEventListener("touchcancel", () => {
+        drawing = false;
+      }, { passive: false });
+    }
 
     window.addEventListener("resize", resize);
     resizeSignatureCanvas = resize;
@@ -1486,7 +1542,9 @@
   function clearSignatureCanvas(showMessage) {
     const canvas = document.getElementById("signatureCanvas");
     const context = canvas.getContext("2d");
-    context.clearRect(0, 0, canvas.width, canvas.height);
+    const rect = canvas.getBoundingClientRect();
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, rect.width || canvas.width, rect.height || canvas.height);
     signatureDirty = false;
     if (showMessage) showSignMessage("签名已清除。");
   }
