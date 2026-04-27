@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260427-watermark-sync";
+  const BUILD_TAG = "20260427-party-a-signature-draft";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -211,6 +211,9 @@
   let openOptionPanelKey = "";
   let canvasReady = false;
   let resizeSignatureCanvas = () => {};
+  const partyASignatureDraftByContractId = new Map();
+  let partyASignatureDrawingContractId = "";
+  let partyASignatureCanvasContractId = "";
   let supabaseClient = createSupabaseBrowserClient();
   let adminSession = null;
   let adminUser = null;
@@ -413,11 +416,17 @@
       document.getElementById("contractPreview").innerHTML = "";
       return;
     }
+    if (shouldDeferPartyASignaturePreview(contract)) return;
+    capturePartyASignatureDraftFromDom();
     const isDraft = contract.status === "draft";
     document.getElementById("contractPreview").innerHTML = isDraft
       ? renderEditableContractDocument(contract)
       : renderContractDocument(contract);
-    if (isDraft) setupPartyASignatureCanvas();
+    if (isDraft) {
+      setupPartyASignatureCanvas();
+    } else {
+      partyASignatureCanvasContractId = "";
+    }
   }
 
   function renderField(contract, field, locked) {
@@ -629,11 +638,19 @@
     const status = STATUS[contract.status] || STATUS.draft;
     document.getElementById("previewMeta").textContent = `${status.label} · ${contract.fields.brand || "未命名合同"}`;
     if (getClosest(document.activeElement, "#contractForm")) return;
+    const shouldDeferPreview = shouldDeferPartyASignaturePreview(contract);
+    capturePartyASignatureDraftFromDom();
     const isDraft = contract.status === "draft";
-    document.getElementById("contractPreview").innerHTML = isDraft
-      ? renderEditableContractDocument(contract)
-      : renderContractDocument(contract);
-    if (isDraft) setupPartyASignatureCanvas();
+    if (!shouldDeferPreview) {
+      document.getElementById("contractPreview").innerHTML = isDraft
+        ? renderEditableContractDocument(contract)
+        : renderContractDocument(contract);
+      if (isDraft) {
+        setupPartyASignatureCanvas();
+      } else {
+        partyASignatureCanvasContractId = "";
+      }
+    }
     document.getElementById("publishBtn").disabled = contract.status !== "draft";
     document.getElementById("revokeBtn").disabled = !["published", "confirmed"].includes(contract.status);
     const shareBox = document.getElementById("shareBox");
@@ -1466,19 +1483,42 @@
 
   function setupPartyASignatureCanvas() {
     const canvas = document.getElementById("partyASignatureCanvas");
-    if (!canvas) return;
+    if (!canvas) {
+      partyASignatureCanvasContractId = "";
+      return;
+    }
     const context = canvas.getContext("2d");
     let drawing = false;
 
     function editableContract() {
-      const contract = currentContract();
-      return contract && contract.status === "draft" ? contract : null;
+      return currentDraftContract();
+    }
+
+    const initialContract = editableContract();
+    partyASignatureCanvasContractId = partyASignatureDraftKey(initialContract);
+
+    function persistDraftSignature() {
+      const contract = editableContract();
+      if (!contract || !canvas.width || !canvas.height) return;
+      setPartyASignatureDraft(contract, compactPartyASignatureDataUrl(canvas));
+    }
+
+    function finishStroke(event) {
+      drawing = false;
+      partyASignatureDrawingContractId = "";
+      persistDraftSignature();
+      if (!event) return;
+      try {
+        canvas.releasePointerCapture(event.pointerId);
+      } catch (error) {
+        // Pointer capture may already be released.
+      }
     }
 
     function resize() {
       const rect = canvas.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
-      const contract = currentContract();
+      const contract = editableContract();
       const ratio = window.devicePixelRatio || 1;
       canvas.width = Math.max(1, Math.floor(rect.width * ratio));
       canvas.height = Math.max(1, Math.floor(rect.height * ratio));
@@ -1487,7 +1527,9 @@
       context.lineJoin = "round";
       context.lineWidth = 2.2;
       context.strokeStyle = "#111";
-      const partyASignature = getIn(contract, ["fields", "partyASignature"]) || getIn(contract, ["snapshot", "fields", "partyASignature"]);
+      const partyASignature = getPartyASignatureDraft(contract)
+        || getIn(contract, ["fields", "partyASignature"])
+        || getIn(contract, ["snapshot", "fields", "partyASignature"]);
       if (contract && partyASignature) {
         const image = new Image();
         image.onload = () => context.drawImage(image, 0, 0, rect.width, rect.height);
@@ -1501,9 +1543,15 @@
     }
 
     canvas.addEventListener("pointerdown", (event) => {
-      if (!editableContract()) return;
+      const contract = editableContract();
+      if (!contract) return;
       drawing = true;
-      canvas.setPointerCapture(event.pointerId);
+      partyASignatureDrawingContractId = partyASignatureDraftKey(contract);
+      try {
+        canvas.setPointerCapture(event.pointerId);
+      } catch (error) {
+        // Pointer capture may not be available in all environments.
+      }
       const p = point(event);
       context.beginPath();
       context.moveTo(p.x, p.y);
@@ -1517,16 +1565,19 @@
     });
 
     canvas.addEventListener("pointerup", (event) => {
-      drawing = false;
-      try {
-        canvas.releasePointerCapture(event.pointerId);
-      } catch (error) {
-        // Pointer capture may already be released.
-      }
+      finishStroke(event);
+    });
+
+    canvas.addEventListener("pointercancel", (event) => {
+      finishStroke(event);
+    });
+
+    canvas.addEventListener("lostpointercapture", () => {
+      finishStroke();
     });
 
     canvas.addEventListener("pointerleave", () => {
-      drawing = false;
+      finishStroke();
     });
 
     const clearPartyButton = document.getElementById("clearPartyASignBtn");
@@ -1534,6 +1585,7 @@
       const contract = editableContract();
       if (!contract) return;
       context.clearRect(0, 0, canvas.width, canvas.height);
+      clearPartyASignatureDraft(contract);
       contract.fields.partyASignature = "";
       contract.updatedAt = nowIso();
       saveStore(true, { reason: "clear-party-a-signature", immediate: true });
@@ -1546,6 +1598,7 @@
       const contract = editableContract();
       if (!contract) return;
       contract.fields.partyASignature = compactPartyASignatureDataUrl(canvas);
+      clearPartyASignatureDraft(contract);
       contract.updatedAt = nowIso();
       saveStore(true, { reason: "save-party-a-signature", immediate: true });
       renderForm();
@@ -1815,6 +1868,53 @@
     if (letters) return letters;
     if (text) return text;
     return "BRAND";
+  }
+
+  function currentDraftContract() {
+    const contract = currentContract();
+    return contract && contract.status === "draft" ? contract : null;
+  }
+
+  function partyASignatureDraftKey(contract) {
+    return contract && contract.id ? String(contract.id) : "";
+  }
+
+  function getPartyASignatureDraft(contract) {
+    const key = partyASignatureDraftKey(contract);
+    return key ? partyASignatureDraftByContractId.get(key) || "" : "";
+  }
+
+  function setPartyASignatureDraft(contract, dataUrl) {
+    const key = partyASignatureDraftKey(contract);
+    if (!key) return;
+    if (dataUrl) {
+      partyASignatureDraftByContractId.set(key, dataUrl);
+    } else {
+      partyASignatureDraftByContractId.delete(key);
+    }
+  }
+
+  function clearPartyASignatureDraft(contract) {
+    setPartyASignatureDraft(contract, "");
+  }
+
+  function shouldDeferPartyASignaturePreview(contract) {
+    return Boolean(
+      contract
+      && contract.status === "draft"
+      && partyASignatureDrawingContractId
+      && partyASignatureDrawingContractId === partyASignatureDraftKey(contract),
+    );
+  }
+
+  function capturePartyASignatureDraftFromDom() {
+    const draftContractId = partyASignatureCanvasContractId;
+    if (!draftContractId) return;
+    const contract = store.contracts.find((item) => String(item.id || "") === draftContractId && item.status === "draft");
+    if (!contract) return;
+    const canvas = document.getElementById("partyASignatureCanvas");
+    if (!canvas || !canvas.width || !canvas.height) return;
+    setPartyASignatureDraft(contract, compactPartyASignatureDataUrl(canvas));
   }
 
   function saveStore(announce, options = {}) {
