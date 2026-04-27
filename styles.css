@@ -763,6 +763,9 @@ textarea:disabled {
 }
 
 .contract-page {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   width: 210mm;
   min-height: 297mm;
   padding: 18mm 25mm;
@@ -772,6 +775,34 @@ textarea:disabled {
   font-family: SimSun, "Songti SC", serif;
   font-size: 11pt;
   line-height: 1.72;
+}
+
+.contract-page-content {
+  position: relative;
+  z-index: 1;
+}
+
+.contract-watermark {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 92%;
+  margin: auto;
+  pointer-events: none;
+  user-select: none;
+  font-family: SimSun, "Songti SC", serif;
+  font-size: clamp(72px, 18vw, 180px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  text-align: center;
+  color: rgba(80, 80, 80, 0.2);
+  transform: rotate(-30deg) scale(1.15);
+  transform-origin: center;
 }
 
 .doc-header {
@@ -1095,6 +1126,13 @@ body.exporting-pdf .contract-page {
     line-height: 1.58;
   }
 
+  .contract-watermark {
+    width: 94%;
+    font-size: clamp(54px, 20vw, 110px);
+    letter-spacing: 0.08em;
+    transform: rotate(-30deg) scale(1.05);
+  }
+
   .doc-title {
     margin-bottom: 18px;
     font-size: 22px;
@@ -1295,5 +1333,13 @@ body.exporting-pdf .contract-page {
     margin: 0;
     padding: 18mm 25mm;
     box-shadow: none;
+  }
+
+  #printRoot .contract-watermark {
+    width: 92%;
+    font-size: 44mm;
+    letter-spacing: 0.14em;
+    color: rgba(80, 80, 80, 0.2);
+    transform: rotate(-30deg) scale(1.08);
   }
 }

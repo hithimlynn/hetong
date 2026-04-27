@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260427-settlement-clause";
+  const BUILD_TAG = "20260427-brand-watermark";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -753,9 +753,10 @@
     const fields = contract.fields;
     const clauses = activeClauseVersion().sections;
     const editable = (key) => renderInlineField(contract, fieldConfig(key), false);
+    const watermark = formatContractWatermark(fields.brand);
     return `
       <article class="contract-document editable-contract">
-        <section class="contract-page">
+        ${renderContractPageShell(watermark, `
           <h1 class="doc-title">${CONTRACT_TITLE}</h1>
           <section class="editable-block">
             <h3>一、合作内容</h3>
@@ -790,7 +791,7 @@
             ${editable("partyASignaturePad")}
           </section>
           ${renderSignatureBlock(contract, fields)}
-        </section>
+        `)}
       </article>
     `;
   }
@@ -810,12 +811,22 @@
     </div>`;
   }
 
+  function renderContractPageShell(watermark, content) {
+    return `
+      <section class="contract-page">
+        <div class="contract-watermark" aria-hidden="true">${escapeHtml(watermark)}</div>
+        <div class="contract-page-content">${content}</div>
+      </section>
+    `;
+  }
+
   function renderContractDocument(contract) {
     const fields = renderFields(contract) || getIn(contract, ["fields"]) || {};
     const clauses = renderClausesForContract(contract);
+    const watermark = formatContractWatermark(fields.brand);
     return `
       <article class="contract-document">
-        <section class="contract-page">
+        ${renderContractPageShell(watermark, `
           <h1 class="doc-title">${CONTRACT_TITLE}</h1>
           <section class="doc-section">
             <h3>一、合作内容</h3>
@@ -836,7 +847,7 @@
           </section>
           ${clauses.map(renderClauseSection).join("")}
           ${renderSignatureBlock(contract, fields)}
-        </section>
+        `)}
       </article>
     `;
   }
@@ -1791,6 +1802,14 @@
     const account = String(fields && fields.platformAccount || "").trim();
     if (platform && account) return `${platform} / ${account}`;
     return platform || account || "-";
+  }
+
+  function formatContractWatermark(brand) {
+    const text = String(brand || "").trim();
+    const letters = (text.match(/[A-Za-z]+/g) || []).join("").toUpperCase();
+    if (letters) return letters;
+    if (text) return text;
+    return "BRAND";
   }
 
   function saveStore(announce, options = {}) {
