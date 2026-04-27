@@ -4,3 +4,8 @@ window.__HETONG_SUPABASE__ = window.__HETONG_SUPABASE__ || {
   adminEmail: "hithimlynn@gmail.com",
   workspaceId: "hetong-main",
 };
+
+window.__HETONG_SIGNER_GATEWAY__ = window.__HETONG_SIGNER_GATEWAY__ || {
+  baseUrl: "https://ui-design-studio-ashy.vercel.app",
+  preferredDomain: "https://sign.amgj.top",
+};

@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/sign-contract",
+      "destination": "/api/sign-contract"
+    }
+  ]
+}

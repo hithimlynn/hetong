@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260425-signer-network-fix";
+  const BUILD_TAG = "20260427-vercel-signer-gateway";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -188,6 +188,7 @@
   };
 
   const supabaseConfig = normalizeSupabaseConfig(window.__HETONG_SUPABASE__ || {});
+  const signerGatewayConfig = normalizeSignerGatewayConfig(window.__HETONG_SIGNER_GATEWAY__ || {});
 
   let store = loadStore();
   let activeView = "editor";
@@ -1944,6 +1945,19 @@
     return next;
   }
 
+  function normalizeSignerGatewayConfig(config) {
+    const value = typeof config === "string"
+      ? config
+      : config && typeof config === "object"
+        ? config.baseUrl || config.url || ""
+        : "";
+    const baseUrl = String(value || "").trim().replace(/\/+$/, "");
+    return {
+      baseUrl,
+      enabled: Boolean(baseUrl),
+    };
+  }
+
   function createSupabaseBrowserClient() {
     try {
       if (!hasSupabaseClientConfig()) return null;
@@ -2394,6 +2408,9 @@
   }
 
   function buildSupabaseFunctionUrl() {
+    if (signerGatewayConfig.enabled) {
+      return `${signerGatewayConfig.baseUrl}/${SUPABASE_FUNCTION_NAME}`;
+    }
     return `${supabaseConfig.url}/functions/v1/${SUPABASE_FUNCTION_NAME}`;
   }
 
