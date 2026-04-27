@@ -6,6 +6,6 @@ window.__HETONG_SUPABASE__ = window.__HETONG_SUPABASE__ || {
 };
 
 window.__HETONG_SIGNER_GATEWAY__ = window.__HETONG_SIGNER_GATEWAY__ || {
-  baseUrl: "https://ui-design-studio-ashy.vercel.app",
+  baseUrl: "https://sign.amgj.top",
   preferredDomain: "https://sign.amgj.top",
 };

@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260427-vercel-signer-gateway";
+  const BUILD_TAG = "20260427-sign-domain-live";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
