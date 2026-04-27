@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260427-share-link-validation-fix";
+  const BUILD_TAG = "20260427-signer-domain-links";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -1976,14 +1976,19 @@
   }
 
   function normalizeSignerGatewayConfig(config) {
+    const next = config && typeof config === "object" ? config : {};
     const value = typeof config === "string"
       ? config
-      : config && typeof config === "object"
-        ? config.baseUrl || config.url || ""
-        : "";
+      : next.baseUrl || next.url || "";
     const baseUrl = String(value || "").trim().replace(/\/+$/, "");
+    const preferredDomain = String(next.preferredDomain || baseUrl || "").trim().replace(/\/+$/, "");
+    const signerAppBaseUrl = String(next.signerAppBaseUrl || preferredDomain || baseUrl || "").trim().replace(/\/+$/, "");
+    const adminAppBaseUrl = String(next.adminAppBaseUrl || "").trim().replace(/\/+$/, "");
     return {
       baseUrl,
+      preferredDomain,
+      signerAppBaseUrl,
+      adminAppBaseUrl,
       enabled: Boolean(baseUrl),
     };
   }
@@ -2474,6 +2479,9 @@
   }
 
   function buildSupabaseFunctionUrl() {
+    if (isSignerAppHost()) {
+      return `/${SUPABASE_FUNCTION_NAME}`;
+    }
     if (signerGatewayConfig.enabled) {
       return `${signerGatewayConfig.baseUrl}/${SUPABASE_FUNCTION_NAME}`;
     }
@@ -2504,7 +2512,7 @@
   function buildSignLink(contract) {
     if (hasAdminCloudConfig()) {
       contract.signWriteToken = contract.signWriteToken || randomToken(24);
-      return `${getUrlBase()}?${buildQueryString({
+      return `${getSignerAppBaseUrl()}?${buildQueryString({
         [SIGN_WORKSPACE_KEY]: supabaseConfig.workspaceId,
         [SIGN_CONTRACT_KEY]: contract.token,
         [SIGN_WRITE_KEY]: contract.signWriteToken,
@@ -3199,6 +3207,25 @@
   function getUrlBase() {
     if (location.protocol && location.host) return `${location.protocol}//${location.host}${location.pathname}`;
     return location.pathname;
+  }
+
+  function getSignerAppBaseUrl() {
+    return signerGatewayConfig.signerAppBaseUrl || signerGatewayConfig.preferredDomain || getUrlBase();
+  }
+
+  function normalizeOrigin(value) {
+    const text = String(value || "").trim().replace(/\/+$/, "");
+    if (!text) return "";
+    try {
+      return new URL(text).origin;
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function isSignerAppHost() {
+    const signerOrigin = normalizeOrigin(getSignerAppBaseUrl());
+    return Boolean(signerOrigin && signerOrigin === location.origin);
   }
 
   function escapeHtml(value) {

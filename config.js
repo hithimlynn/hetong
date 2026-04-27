@@ -8,4 +8,6 @@ window.__HETONG_SUPABASE__ = window.__HETONG_SUPABASE__ || {
 window.__HETONG_SIGNER_GATEWAY__ = window.__HETONG_SIGNER_GATEWAY__ || {
   baseUrl: "https://sign.amgj.top",
   preferredDomain: "https://sign.amgj.top",
+  signerAppBaseUrl: "https://sign.amgj.top/",
+  adminAppBaseUrl: "https://hithimlynn.github.io/hetong/",
 };
