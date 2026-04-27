@@ -965,6 +965,79 @@ textarea:disabled {
   gap: 12px;
 }
 
+.clause-template-panel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.clause-template-library {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px;
+  background: #fbfcfe;
+}
+
+.clause-template-library-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  margin-bottom: 10px;
+  color: #607086;
+  font-size: 13px;
+}
+
+.clause-template-list {
+  display: grid;
+  gap: 8px;
+}
+
+.clause-template-button {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+}
+
+.clause-template-button.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(28, 100, 242, 0.15);
+  background: #f5f8ff;
+}
+
+.clause-template-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.clause-template-title strong {
+  font-size: 14px;
+  color: #1d2a3a;
+}
+
+.clause-template-badge {
+  font-size: 12px;
+  line-height: 1;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #e9f1ff;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.clause-template-meta {
+  color: #607086;
+  font-size: 12px;
+}
+
 .clause-item {
   padding: 12px;
   border: 1px solid var(--line);
@@ -1102,6 +1175,12 @@ body.exporting-pdf .contract-page {
 
   .main-area {
     padding: 10px;
+  }
+
+  .clause-template-library-head,
+  .clause-template-title {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .doc-scroll {

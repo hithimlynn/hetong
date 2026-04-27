@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>合同生成系统</title>
-    <link rel="stylesheet" href="./styles.css?v=20260427-party-a-signature-draft" />
+    <link rel="stylesheet" href="./styles.css?v=20260427-clause-template-library" />
   </head>
   <body class="auth-locked">
     <section class="auth-screen" aria-label="甲方登录">
@@ -132,6 +132,19 @@
                 </div>
                 <button class="primary-button" id="saveClauseVersionBtn" type="button">保存为新版本</button>
               </div>
+              <div class="clause-template-panel">
+                <label class="field is-wide">
+                  <span>模板名称</span>
+                  <input id="clauseVersionName" type="text" placeholder="请输入模板名称" />
+                </label>
+                <div class="clause-template-library">
+                  <div class="clause-template-library-head">
+                    <strong>模板库</strong>
+                    <span>切换后将作为默认模板用于后续新建合同</span>
+                  </div>
+                  <div id="clauseTemplateList" class="clause-template-list"></div>
+                </div>
+              </div>
               <div id="clauseList" class="clause-list"></div>
             </section>
           </section>
@@ -140,8 +153,8 @@
     </div>
 
     <div id="printRoot" aria-hidden="true"></div>
-    <script src="./config.js?v=20260427-party-a-signature-draft"></script>
-    <script src="./vendor/supabase.js?v=20260427-party-a-signature-draft"></script>
-    <script src="./app.js?v=20260427-party-a-signature-draft"></script>
+    <script src="./config.js?v=20260427-clause-template-library"></script>
+    <script src="./vendor/supabase.js?v=20260427-clause-template-library"></script>
+    <script src="./app.js?v=20260427-clause-template-library"></script>
   </body>
 </html>

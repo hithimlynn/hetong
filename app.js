@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260427-party-a-signature-draft";
+  const BUILD_TAG = "20260427-clause-template-library";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -214,6 +214,7 @@
   const partyASignatureDraftByContractId = new Map();
   let partyASignatureDrawingContractId = "";
   let partyASignatureCanvasContractId = "";
+  const clauseEditorDraftByVersionId = new Map();
   let supabaseClient = createSupabaseBrowserClient();
   let adminSession = null;
   let adminUser = null;
@@ -321,6 +322,8 @@
     document.getElementById("signerPrintBtn").addEventListener("click", printCurrentContract);
     document.getElementById("copyLinkBtn").addEventListener("click", copyShareLink);
     document.getElementById("saveClauseVersionBtn").addEventListener("click", saveClauseVersion);
+    document.getElementById("clausesView").addEventListener("input", handleClauseEditorInput);
+    document.getElementById("clausesView").addEventListener("click", handleClauseTemplateClick);
     document.getElementById("clearSignBtn").addEventListener("click", () => {
       clearSignatureCanvas(true);
       resetSignerUpload();
@@ -709,10 +712,25 @@
     resizeSignatureCanvas();
   }
 
-  function renderClauses() {
+function renderClauses() {
     const version = activeClauseVersion();
+    const draft = clauseEditorDraft(version);
     document.getElementById("clauseMeta").textContent = `${version.version} · ${formatDateTime(version.updatedAt)} · ${version.maintainer}`;
-    document.getElementById("clauseList").innerHTML = version.sections.map((clause, index) => `
+    document.getElementById("clauseVersionName").value = draft.versionName;
+    document.getElementById("clauseTemplateList").innerHTML = normalizedClauseTemplateOptions().map((item) => `
+      <button
+        class="clause-template-button${item.id === version.id ? " is-active" : ""}"
+        type="button"
+        data-clause-template-id="${escapeAttr(item.id)}"
+      >
+        <span class="clause-template-title">
+          <strong>${escapeHtml(item.version)}</strong>
+          ${item.id === version.id ? '<span class="clause-template-badge">当前默认模板</span>' : ""}
+        </span>
+        <span class="clause-template-meta">${escapeHtml(formatDateTime(item.updatedAt))} · ${escapeHtml(item.maintainer)}</span>
+      </button>
+    `).join("");
+    document.getElementById("clauseList").innerHTML = draft.sections.map((clause, index) => `
       <article class="clause-item">
         <label class="field is-wide">
           <span>条款标题</span>
@@ -726,32 +744,41 @@
     `).join("");
   }
 
+  function handleClauseEditorInput() {
+    const version = activeClauseVersion();
+    if (!version) return;
+    clauseEditorDraftByVersionId.set(version.id, collectClauseEditorDraft(version));
+  }
+
+  function handleClauseTemplateClick(event) {
+    const button = getClosest(event.target, "[data-clause-template-id]");
+    if (!button) return;
+    const versionId = String(button.dataset.clauseTemplateId || "").trim();
+    if (!versionId || versionId === store.activeClauseVersionId) return;
+    captureClauseEditorDraftFromDom();
+    store.activeClauseVersionId = versionId;
+    saveStore(true, { reason: "switch-clause-template" });
+    renderAll();
+    const next = activeClauseVersion();
+    document.getElementById("syncState").textContent = `已切换默认模板 ${next.version}`;
+  }
+
   function saveClauseVersion() {
-    const blocks = Array.from(document.querySelectorAll(".clause-item"));
-    const sections = blocks.map((block, index) => {
-      const titleInput = block.querySelector('[data-clause-field="title"]');
-      const bodyInput = block.querySelector('[data-clause-field="body"]');
-      const title = (titleInput ? titleInput.value.trim() : "") || `条款 ${index + 1}`;
-      const bodyText = bodyInput ? bodyInput.value : "";
-      const body = bodyText
-        .split(/\n+/)
-        .map((line) => line.trim())
-        .filter(Boolean);
-      return { title, body: body.length ? body : ["请填写条款内容。"] };
-    });
     const previous = activeClauseVersion();
+    const draft = collectClauseEditorDraft(previous);
     const next = {
       id: randomToken(12),
-      version: bumpClauseVersion(previous.version),
+      version: draft.versionName || bumpClauseVersion(previous.version),
       maintainer: "甲方",
       updatedAt: nowIso(),
-      sections,
+      sections: draft.sections,
     };
     store.clauseVersions.push(next);
     store.activeClauseVersionId = next.id;
-    saveStore(true);
+    clauseEditorDraftByVersionId.set(next.id, clone(draft));
+    saveStore(true, { reason: "save-clause-template", immediate: true });
     renderAll();
-    document.getElementById("syncState").textContent = `已保存条款 ${next.version}`;
+    document.getElementById("syncState").textContent = `已保存新模板 ${next.version}`;
   }
 
   function renderTopState() {
@@ -2064,6 +2091,57 @@
       normalized.push(seedClauseVersions()[0]);
     }
     return normalized;
+  }
+
+  function normalizedClauseTemplateOptions() {
+    return normalizeClauseVersions(store.clauseVersions).slice().sort((left, right) => (
+      latestTimestamp([right.updatedAt]) - latestTimestamp([left.updatedAt])
+    ));
+  }
+
+  function clauseEditorDraft(version) {
+    if (!version) {
+      return {
+        versionName: "",
+        sections: clone(DEFAULT_CLAUSES),
+      };
+    }
+    const draft = clauseEditorDraftByVersionId.get(version.id);
+    if (draft && Array.isArray(draft.sections) && draft.sections.length) {
+      return clone(draft);
+    }
+    return {
+      versionName: version.version || "",
+      sections: clone(version.sections || DEFAULT_CLAUSES),
+    };
+  }
+
+  function collectClauseEditorDraft(version) {
+    const versionNameInput = document.getElementById("clauseVersionName");
+    const versionName = String(versionNameInput ? versionNameInput.value : "").trim() || (version && version.version) || "";
+    const blocks = Array.from(document.querySelectorAll(".clause-item"));
+    const sections = blocks.length
+      ? blocks.map((block, index) => {
+        const titleInput = block.querySelector('[data-clause-field="title"]');
+        const bodyInput = block.querySelector('[data-clause-field="body"]');
+        const title = (titleInput ? titleInput.value.trim() : "") || `条款 ${index + 1}`;
+        const bodyText = bodyInput ? bodyInput.value : "";
+        const body = bodyText
+          .split(/\n+/)
+          .map((line) => line.trim())
+          .filter(Boolean);
+        return { title, body: body.length ? body : ["请填写条款内容。"] };
+      })
+      : clone((version && version.sections) || DEFAULT_CLAUSES);
+    return { versionName, sections };
+  }
+
+  function captureClauseEditorDraftFromDom() {
+    const version = activeClauseVersion();
+    if (!version) return;
+    const list = document.getElementById("clauseList");
+    if (!list || !list.children.length) return;
+    clauseEditorDraftByVersionId.set(version.id, collectClauseEditorDraft(version));
   }
 
   function parseHashRoute() {
