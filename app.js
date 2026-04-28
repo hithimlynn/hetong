@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260428-clause-preview-clarity";
+  const BUILD_TAG = "20260428-inline-dynamic-clauses";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -338,6 +338,8 @@
   let adminEditingFieldKey = "";
   let adminEditingSessionUntil = 0;
   let adminDatePickerFieldKey = "";
+  let activeInlineClauseToken = "";
+  let pendingInlineClauseFocusToken = "";
   const clauseEditorDraftByVersionId = new Map();
   let clauseEditingVersionId = "";
   let clauseEditingFieldKey = "";
@@ -763,6 +765,16 @@
 
   function handleFormClick(event) {
     beginAdminEditingSession(event.target, contractFormFreezeDuration(event.target) || 1800);
+    const inlineToken = getClosest(event.target, "[data-inline-clause-token]");
+    if (inlineToken) {
+      openInlineClauseEditor(inlineToken.dataset.inlineClauseToken || "");
+      return;
+    }
+    const inlineClose = getClosest(event.target, "[data-inline-clause-close]");
+    if (inlineClose) {
+      closeInlineClauseEditor({ forceRefresh: true });
+      return;
+    }
     const toggle = getClosest(event.target, "[data-option-toggle]");
     if (toggle) {
       toggleOptionPanel(toggle.dataset.optionToggle);
@@ -808,6 +820,18 @@
 
   function handleFormKeydown(event) {
     beginAdminEditingSession(event.target, event.target && event.target.type === "date" ? 12000 : 6000);
+    if (getClosest(event.target, "[data-inline-clause-editor]")) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeInlineClauseEditor({ forceRefresh: true });
+        return;
+      }
+      if (event.key === "Enter" && event.target.tagName !== "TEXTAREA") {
+        event.preventDefault();
+        closeInlineClauseEditor({ forceRefresh: true });
+        return;
+      }
+    }
     const optionInput = getClosest(event.target, "[data-option-new]");
     if (!optionInput || event.key !== "Enter") return;
     event.preventDefault();
@@ -941,8 +965,11 @@
     pendingAdminPreviewRefresh = false;
     if (isDraft) {
       setupPartyASignatureCanvas();
+      restoreInlineClauseEditorFocus();
     } else {
       partyASignatureCanvasContractId = "";
+      activeInlineClauseToken = "";
+      pendingInlineClauseFocusToken = "";
     }
   }
 
@@ -1016,6 +1043,17 @@
   }
 
   function handleContractFormFocusOut(event) {
+    const inlineEditor = getClosest(event.target, "[data-inline-clause-editor]");
+    if (inlineEditor) {
+      const nextTarget = event.relatedTarget;
+      if (nextTarget && getClosest(nextTarget, "[data-inline-clause-editor]") === inlineEditor) return;
+      window.setTimeout(() => {
+        const active = document.activeElement;
+        if (active && getClosest(active, "[data-inline-clause-editor]") === inlineEditor) return;
+        closeInlineClauseEditor({ forceRefresh: true });
+      }, 0);
+      return;
+    }
     const nextTarget = event.relatedTarget;
     if (nextTarget && getClosest(nextTarget, "#contractForm")) return;
     pendingAdminPreviewRefresh = true;
@@ -1222,15 +1260,11 @@ function renderClauses(options = {}) {
       return;
     }
     const draft = clauseEditorDraft(version);
-    const contract = currentContract();
-    const fields = renderFields(contract) || getIn(contract, ["fields"]) || DEFAULT_FIELDS;
-    const previewSections = clone(DEFAULT_CLAUSES.slice(0, 2));
     const tailSections = normalizeTailClauseSections(draft.sections, DEFAULT_CLAUSES.slice(2));
     const nextIdentity = buildClauseEditorIdentity(version, draft);
     if (!force && !pendingClauseViewRefresh && nextIdentity === lastClauseEditorIdentity) return;
     document.getElementById("clauseVersionName").value = draft.versionName;
     document.getElementById("clauseList").innerHTML = `
-      ${previewSections.map((clause) => renderClausePreviewCard(clause, fields)).join("")}
       ${tailSections.map((clause, index) => `
         <article class="clause-item" data-clause-editable="true">
           <label class="field is-wide">
@@ -1310,7 +1344,7 @@ function renderClauses(options = {}) {
     if (contract.status !== "draft") return renderContractDocument(contract);
     const fields = contract.fields;
     const clauses = composeEditableContractClauses(contract);
-    const dynamicClauses = clauses.slice(0, 2);
+    const dynamicClauses = clone(DEFAULT_CLAUSES.slice(0, 2));
     const tailClauses = clauses.slice(2);
     const editable = (key) => renderInlineField(contract, fieldConfig(key), false);
     const watermark = formatContractWatermark(fields.brand);
@@ -1339,40 +1373,7 @@ function renderClauses(options = {}) {
               ${editable("amountUpper")}
             </div>
           </section>
-          <section class="editable-block">
-            <h3>三、档期与流程设置</h3>
-            <div class="embedded-grid two-col">
-              ${editable("draftSubmitDeadlineDate")}
-              ${editable("draftSubmitDeadlineTime")}
-              ${editable("reviewContact")}
-              ${editable("reviewFeedbackWorkdays")}
-              ${editable("finalRevisionWorkdays")}
-              ${editable("publishTime")}
-              ${editable("rescheduleNoticeHours")}
-            </div>
-            ${editable("sampleFeedbackNote")}
-            ${renderClausePreviewCard(dynamicClauses[0], fields, {
-              title: "三、档期与流程（预览）",
-              lead: "上方时间、联系人和反馈时限会同步更新到这一段。",
-            })}
-          </section>
-          <section class="editable-block">
-            <h3>四、推广费用与支付设置</h3>
-            <div class="embedded-grid two-col">
-              ${editable("maintenanceDays")}
-              ${editable("prepaymentWorkdays")}
-              ${editable("prepaymentPercent")}
-              ${editable("finalPaymentAfterPublishDays")}
-              ${editable("finalPaymentWorkdays")}
-              ${editable("finalPaymentPercent")}
-            </div>
-            ${editable("performanceMetric")}
-            ${editable("deductionScenario")}
-            ${renderClausePreviewCard(dynamicClauses[1], fields, {
-              title: "四、推广费用与支付（预览）",
-              lead: "上方金额、比例、统计周期和达标标准会同步更新到这一段。",
-            })}
-          </section>
+          ${dynamicClauses.map((clause) => renderEditableDynamicClauseSection(clause, contract)).join("")}
           ${tailClauses.map((clause) => renderClauseSection(clause, fields)).join("")}
           <section class="editable-block signature-edit-block">
             <h3>甲方签署</h3>
@@ -1498,6 +1499,100 @@ function renderClauses(options = {}) {
   function renderClausePreviewValue(token, fields = {}) {
     const value = clauseTemplateValue(token, fields) || "未填写";
     return `<span class="clause-token-highlight">${escapeHtml(value)}</span>`;
+  }
+
+  function renderEditableDynamicClauseSection(clause, contract) {
+    const fields = renderFields(contract) || getIn(contract, ["fields"]) || {};
+    return `
+      <section class="doc-section doc-section-editable-clause">
+        <h3>${escapeHtml(resolveClauseTemplateText(clause.title, fields))}</h3>
+        ${clause.body.map((line) => `<p>${renderEditableDynamicClauseLine(line, contract, fields)}</p>`).join("")}
+      </section>
+    `;
+  }
+
+  function renderEditableDynamicClauseLine(line, contract, fields = {}) {
+    const source = String(line || "");
+    const pattern = /\{\{([a-zA-Z0-9_]+)\}\}/g;
+    if (!pattern.test(source)) return escapeHtml(resolveClauseTemplateText(source, fields));
+    pattern.lastIndex = 0;
+    let html = "";
+    let cursor = 0;
+    let match;
+    while ((match = pattern.exec(source))) {
+      html += escapeHtml(source.slice(cursor, match.index));
+      html += renderEditableClauseValue(match[1], contract, fields);
+      cursor = match.index + match[0].length;
+    }
+    html += escapeHtml(source.slice(cursor));
+    return html;
+  }
+
+  function renderEditableClauseValue(token, contract, fields = {}) {
+    if (activeInlineClauseToken === token) {
+      return renderInlineClauseEditor(contract, token);
+    }
+    const value = clauseTemplateValue(token, fields) || "未填写";
+    if (!isInlineClauseTokenEditable(token)) {
+      return `<span class="clause-token-highlight">${escapeHtml(value)}</span>`;
+    }
+    return `<button class="clause-token-button" type="button" data-inline-clause-token="${escapeAttr(token)}">${escapeHtml(value)}</button>`;
+  }
+
+  function isInlineClauseTokenEditable(token) {
+    return inlineClauseFieldKeys(token).length > 0;
+  }
+
+  function inlineClauseFieldKeys(token) {
+    const mapping = {
+      draftSubmitDeadline: ["draftSubmitDeadlineDate", "draftSubmitDeadlineTime"],
+      reviewContact: ["reviewContact"],
+      reviewFeedbackWorkdays: ["reviewFeedbackWorkdays"],
+      sampleFeedbackNote: ["sampleFeedbackNote"],
+      finalRevisionWorkdays: ["finalRevisionWorkdays"],
+      finalPublishDeadline: ["publishDate", "publishTime"],
+      rescheduleNoticeHours: ["rescheduleNoticeHours"],
+      maintenanceDays: ["maintenanceDays"],
+      prepaymentWorkdays: ["prepaymentWorkdays"],
+      prepaymentPercent: ["prepaymentPercent"],
+      finalPaymentAfterPublishDays: ["finalPaymentAfterPublishDays"],
+      finalPaymentWorkdays: ["finalPaymentWorkdays"],
+      finalPaymentPercent: ["finalPaymentPercent"],
+      performanceMetric: ["performanceMetric"],
+      deductionScenario: ["deductionScenario"],
+    };
+    return mapping[token] || [];
+  }
+
+  function renderInlineClauseEditor(contract, token) {
+    const fieldKeys = inlineClauseFieldKeys(token);
+    if (!fieldKeys.length) {
+      const fields = renderFields(contract) || getIn(contract, ["fields"]) || {};
+      return `<span class="clause-token-highlight">${escapeHtml(clauseTemplateValue(token, fields) || "未填写")}</span>`;
+    }
+    return `
+      <span class="inline-clause-editor${fieldKeys.length > 1 ? " is-compound" : ""}" data-inline-clause-editor="${escapeAttr(token)}">
+        ${fieldKeys.map((fieldKey) => renderInlineClauseEditorField(contract, fieldKey)).join("")}
+        <button class="inline-clause-editor-close" type="button" data-inline-clause-close="${escapeAttr(token)}">完成</button>
+      </span>
+    `;
+  }
+
+  function renderInlineClauseEditorField(contract, fieldKey) {
+    const field = fieldConfig(fieldKey);
+    const value = contract.fields[fieldKey] || "";
+    if (field.type === "textarea") {
+      return `<textarea class="inline-clause-editor-control is-textarea" data-field-key="${field.key}" rows="3">${escapeHtml(value)}</textarea>`;
+    }
+    return `
+      <input
+        class="inline-clause-editor-control"
+        data-field-key="${field.key}"
+        type="${field.type || "text"}"
+        value="${escapeAttr(value)}"
+        placeholder="${escapeAttr(field.label || "")}"
+      />
+    `;
   }
 
   function resolveClauseTemplateText(text, fields = {}) {
@@ -1685,6 +1780,8 @@ function renderClauses(options = {}) {
 
   function createContract() {
     clearAdminEditingSession({ force: true, clearPending: true });
+    activeInlineClauseToken = "";
+    pendingInlineClauseFocusToken = "";
     const contract = makeContract();
     store.contracts.unshift(contract);
     store.selectedId = contract.id;
@@ -1717,6 +1814,8 @@ function renderClauses(options = {}) {
       return;
     }
     clearAdminEditingSession({ force: true, clearPending: true });
+    activeInlineClauseToken = "";
+    pendingInlineClauseFocusToken = "";
     contract.status = "published";
     contract.publishedAt = nowIso();
     contract.updatedAt = contract.publishedAt;
@@ -1753,6 +1852,8 @@ function renderClauses(options = {}) {
     const contract = currentContract();
     if (!contract || !["published", "confirmed"].includes(contract.status)) return;
     clearAdminEditingSession({ force: true, clearPending: true });
+    activeInlineClauseToken = "";
+    pendingInlineClauseFocusToken = "";
     contract.status = "revoked";
     contract.updatedAt = nowIso();
     contract.audit.push(makeAudit("撤回合同", "乙方签署链接失效"));
@@ -1855,6 +1956,8 @@ function renderClauses(options = {}) {
     const item = getClosest(event.target, "[data-contract-id]");
     if (!item) return;
     clearAdminEditingSession({ force: true, clearPending: true });
+    activeInlineClauseToken = "";
+    pendingInlineClauseFocusToken = "";
     store.selectedId = item.dataset.contractId;
     activeView = "editor";
     signerToken = "";
@@ -1876,6 +1979,8 @@ function renderClauses(options = {}) {
     const ok = window.confirm(`确定删除合同「${contract.fields.brand || contract.fields.creatorName || "未命名合同"}」？`);
     if (!ok) return;
     clearAdminEditingSession({ force: true, clearPending: true });
+    activeInlineClauseToken = "";
+    pendingInlineClauseFocusToken = "";
     store.deletedContracts = normalizeDeletedContracts([
       ...(Array.isArray(store.deletedContracts) ? store.deletedContracts : []),
       {
@@ -3077,6 +3182,38 @@ function renderClauses(options = {}) {
     const list = document.getElementById("clauseList");
     if (!list || !list.children.length) return;
     clauseEditorDraftByVersionId.set(version.id, collectClauseEditorDraft(version));
+  }
+
+  function openInlineClauseEditor(token) {
+    const nextToken = String(token || "").trim();
+    if (!nextToken || !isInlineClauseTokenEditable(nextToken)) return;
+    activeInlineClauseToken = nextToken;
+    pendingInlineClauseFocusToken = nextToken;
+    lockAdminPreview(8000);
+    renderForm({ force: true, ignoreDefer: true });
+  }
+
+  function closeInlineClauseEditor(options = {}) {
+    if (!activeInlineClauseToken) return;
+    activeInlineClauseToken = "";
+    pendingInlineClauseFocusToken = "";
+    if (options.forceRefresh) {
+      pendingAdminPreviewRefresh = false;
+      renderForm({ force: true, ignoreDefer: true });
+      renderPreview();
+    }
+  }
+
+  function restoreInlineClauseEditorFocus() {
+    if (!pendingInlineClauseFocusToken) return;
+    const token = pendingInlineClauseFocusToken;
+    pendingInlineClauseFocusToken = "";
+    window.requestAnimationFrame(() => {
+      const target = document.querySelector(`[data-inline-clause-editor="${token}"] [data-field-key]`);
+      if (!target) return;
+      target.focus();
+      if (typeof target.select === "function" && target.tagName === "INPUT") target.select();
+    });
   }
 
   function parseHashRoute() {
