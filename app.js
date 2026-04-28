@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260428-signer-speed-trust";
+  const BUILD_TAG = "20260428-stats-period-select";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -339,6 +339,9 @@
     brand: "",
     platform: "",
   };
+  const initialStatsDate = new Date();
+  let statsYear = initialStatsDate.getFullYear();
+  let statsMonth = initialStatsDate.getMonth() + 1;
   let isMobileContractLibraryOpen = false;
   let canvasReady = false;
   let resizeSignatureCanvas = () => {};
@@ -499,6 +502,8 @@
     document.getElementById("contractList").addEventListener("click", selectContractFromList);
     document.getElementById("searchInput").addEventListener("input", renderContractList);
     document.getElementById("sidebarFilters").addEventListener("click", handleSidebarFilterClick);
+    document.getElementById("statsYearSelect").addEventListener("change", handleStatsPeriodChange);
+    document.getElementById("statsMonthSelect").addEventListener("change", handleStatsPeriodChange);
     const mobileLibraryToggle = document.getElementById("mobileLibraryToggle");
     if (mobileLibraryToggle) {
       mobileLibraryToggle.addEventListener("click", toggleMobileContractLibrary);
@@ -578,13 +583,62 @@
   }
 
   function renderMonthlyStats() {
-    const now = new Date();
-    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const monthContracts = store.contracts.filter((contract) => String(contract.createdAt || "").startsWith(month));
+    const statsTitle = document.getElementById("statsTitle");
+    const yearSelect = document.getElementById("statsYearSelect");
+    const monthSelect = document.getElementById("statsMonthSelect");
+    const yearOptions = statsYearOptions();
+    const normalizedYear = yearOptions.includes(statsYear) ? statsYear : yearOptions[0];
+    statsYear = normalizedYear || initialStatsDate.getFullYear();
+    statsMonth = Math.min(12, Math.max(1, Number(statsMonth) || initialStatsDate.getMonth() + 1));
+    if (statsTitle) statsTitle.textContent = `${statsYear}年${statsMonth}月统计`;
+    if (yearSelect) {
+      yearSelect.innerHTML = yearOptions.map((year) => `<option value="${year}">${year}年</option>`).join("");
+      yearSelect.value = String(statsYear);
+    }
+    if (monthSelect) {
+      monthSelect.innerHTML = Array.from({ length: 12 }, (_, index) => {
+        const monthValue = index + 1;
+        return `<option value="${monthValue}">${monthValue}月</option>`;
+      }).join("");
+      monthSelect.value = String(statsMonth);
+    }
+    const month = `${statsYear}-${String(statsMonth).padStart(2, "0")}`;
+    const monthContracts = store.contracts.filter((contract) => contractStatsMonthKey(contract) === month);
     const amount = monthContracts.reduce((sum, contract) => sum + Number(contract.fields.price || 0), 0);
     document.getElementById("monthCount").textContent = String(monthContracts.length);
     document.getElementById("monthAmount").textContent = formatMoney(amount);
     document.getElementById("signedCount").textContent = String(monthContracts.filter((contract) => contract.status === "signed").length);
+  }
+
+  function handleStatsPeriodChange(event) {
+    if (event.target.id === "statsYearSelect") {
+      statsYear = Number(event.target.value) || statsYear;
+    } else if (event.target.id === "statsMonthSelect") {
+      statsMonth = Number(event.target.value) || statsMonth;
+    }
+    renderMonthlyStats();
+  }
+
+  function statsYearOptions() {
+    const years = new Set([initialStatsDate.getFullYear(), statsYear]);
+    store.contracts.forEach((contract) => {
+      const key = contractStatsMonthKey(contract);
+      if (key) years.add(Number(key.slice(0, 4)));
+    });
+    return Array.from(years)
+      .filter((year) => Number.isFinite(year) && year > 1900)
+      .sort((left, right) => right - left);
+  }
+
+  function contractStatsMonthKey(contract) {
+    const value = [
+      contract && contract.createdAt,
+      contract && contract.publishedAt,
+      contract && contract.signedAt,
+      contract && contract.updatedAt,
+    ].find((item) => String(item || "").trim());
+    const normalized = normalizeDateLike(value);
+    return normalized ? normalized.slice(0, 7) : "";
   }
 
   function renderMobileLibraryState(visibleCount) {
