@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260428-option-pool-fix";
+  const BUILD_TAG = "20260428-clause-editor-session-lock";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -224,6 +224,12 @@
   let adminEditingSessionUntil = 0;
   let adminDatePickerFieldKey = "";
   const clauseEditorDraftByVersionId = new Map();
+  let clauseEditingVersionId = "";
+  let clauseEditingFieldKey = "";
+  let clauseEditingSessionUntil = 0;
+  let clauseEditingReleaseTimer = 0;
+  let pendingClauseViewRefresh = false;
+  let lastClauseEditorIdentity = "";
   let supabaseClient = createSupabaseBrowserClient();
   let adminSession = null;
   let adminUser = null;
@@ -333,6 +339,10 @@
     document.getElementById("saveClauseVersionBtn").addEventListener("click", saveClauseVersion);
     document.getElementById("clausesView").addEventListener("input", handleClauseEditorInput);
     document.getElementById("clausesView").addEventListener("click", handleClauseTemplateClick);
+    document.getElementById("clausesView").addEventListener("pointerdown", handleClauseEditorPointerDown, true);
+    document.getElementById("clausesView").addEventListener("focusin", handleClauseEditorFocusIn);
+    document.getElementById("clausesView").addEventListener("focusout", handleClauseEditorFocusOut);
+    document.getElementById("clausesView").addEventListener("keydown", handleClauseEditorKeydown);
     document.getElementById("clearSignBtn").addEventListener("click", () => {
       clearSignatureCanvas(true);
       resetSignerUpload();
@@ -929,11 +939,9 @@
     resizeSignatureCanvas();
   }
 
-function renderClauses() {
+function renderClauses(options = {}) {
     const version = activeClauseVersion();
-    const draft = clauseEditorDraft(version);
     document.getElementById("clauseMeta").textContent = `${version.version} · ${formatDateTime(version.updatedAt)} · ${version.maintainer}`;
-    document.getElementById("clauseVersionName").value = draft.versionName;
     document.getElementById("clauseTemplateList").innerHTML = normalizedClauseTemplateOptions().map((item) => `
       <button
         class="clause-template-button${item.id === version.id ? " is-active" : ""}"
@@ -947,6 +955,8 @@ function renderClauses() {
         <span class="clause-template-meta">${escapeHtml(formatDateTime(item.updatedAt))} · ${escapeHtml(item.maintainer)}</span>
       </button>
     `).join("");
+    renderClauseEditorContent(version, options);
+    return;
     document.getElementById("clauseList").innerHTML = draft.sections.map((clause, index) => `
       <article class="clause-item">
         <label class="field is-wide">
@@ -961,9 +971,45 @@ function renderClauses() {
     `).join("");
   }
 
-  function handleClauseEditorInput() {
+  function renderClauseEditorContent(version, options = {}) {
+    const force = Boolean(options && options.force);
+    const ignoreDefer = Boolean(options && options.ignoreDefer);
+    if (!version) {
+      document.getElementById("clauseVersionName").value = "";
+      document.getElementById("clauseList").innerHTML = "";
+      lastClauseEditorIdentity = "";
+      pendingClauseViewRefresh = false;
+      clearClauseEditingSession({ force: true, clearPending: true });
+      return;
+    }
+    if (!ignoreDefer && shouldDeferClauseViewRefresh(version)) {
+      pendingClauseViewRefresh = true;
+      return;
+    }
+    const draft = clauseEditorDraft(version);
+    const nextIdentity = buildClauseEditorIdentity(version, draft);
+    if (!force && !pendingClauseViewRefresh && nextIdentity === lastClauseEditorIdentity) return;
+    document.getElementById("clauseVersionName").value = draft.versionName;
+    document.getElementById("clauseList").innerHTML = draft.sections.map((clause, index) => `
+      <article class="clause-item">
+        <label class="field is-wide">
+          <span>鏉℃鏍囬</span>
+          <input data-clause-index="${index}" data-clause-field="title" type="text" value="${escapeAttr(clause.title)}" />
+        </label>
+        <label class="field is-wide">
+          <span>鏉℃鍐呭</span>
+          <textarea class="clause-textarea" data-clause-index="${index}" data-clause-field="body">${escapeHtml(clause.body.join("\n"))}</textarea>
+        </label>
+      </article>
+    `).join("");
+    lastClauseEditorIdentity = nextIdentity;
+    pendingClauseViewRefresh = false;
+  }
+
+  function handleClauseEditorInput(event) {
     const version = activeClauseVersion();
     if (!version) return;
+    beginClauseEditingSession(event.target, clauseEditorFreezeDuration(event.target) || 2200);
     clauseEditorDraftByVersionId.set(version.id, collectClauseEditorDraft(version));
   }
 
@@ -973,9 +1019,11 @@ function renderClauses() {
     const versionId = String(button.dataset.clauseTemplateId || "").trim();
     if (!versionId || versionId === store.activeClauseVersionId) return;
     captureClauseEditorDraftFromDom();
+    clearClauseEditingSession({ force: true, clearPending: true });
     store.activeClauseVersionId = versionId;
     saveStore(true, { reason: "switch-clause-template" });
-    renderAll();
+    renderClauses({ force: true, ignoreDefer: true });
+    renderTopState();
     const next = activeClauseVersion();
     document.getElementById("syncState").textContent = `已切换默认模板 ${next.version}`;
   }
@@ -993,8 +1041,10 @@ function renderClauses() {
     store.clauseVersions.push(next);
     store.activeClauseVersionId = next.id;
     clauseEditorDraftByVersionId.set(next.id, clone(draft));
+    clearClauseEditingSession({ force: true, clearPending: true });
     saveStore(true, { reason: "save-clause-template", immediate: true });
-    renderAll();
+    renderClauses({ force: true, ignoreDefer: true });
+    renderTopState();
     document.getElementById("syncState").textContent = `已保存新模板 ${next.version}`;
   }
 
@@ -2263,6 +2313,137 @@ function renderClauses() {
     const canvas = document.getElementById("partyASignatureCanvas");
     if (!canvas || !canvas.width || !canvas.height) return;
     setPartyASignatureDraft(contract, compactPartyASignatureDataUrl(canvas));
+  }
+
+  function buildClauseEditorIdentity(version, draft) {
+    return JSON.stringify({
+      id: version ? version.id || "" : "",
+      updatedAt: version ? version.updatedAt || "" : "",
+      versionName: draft ? draft.versionName || "" : "",
+      sections: draft ? draft.sections || [] : [],
+    });
+  }
+
+  function isClauseEditorInteractionActive() {
+    const activeElement = document.activeElement;
+    if (!activeElement || !getClosest(activeElement, "#clausesView")) return false;
+    return ["INPUT", "TEXTAREA"].includes(activeElement.tagName);
+  }
+
+  function clauseEditorFreezeDuration(target) {
+    if (!target || !getClosest(target, "#clausesView")) return 0;
+    const clauseField = String(target.dataset.clauseField || "").trim();
+    if (clauseField === "body") return 7600;
+    if (clauseField === "title") return 5600;
+    if (target.id === "clauseVersionName") return 5600;
+    if (target.tagName === "TEXTAREA") return 7200;
+    if (target.tagName === "INPUT") return 5200;
+    return 3200;
+  }
+
+  function resolveClauseEditingFieldKey(target) {
+    if (!target) return "";
+    return String(
+      target.dataset.clauseField
+      || target.dataset.clauseTemplateId
+      || target.id
+      || target.name
+      || target.type
+      || "clauses"
+    ).trim();
+  }
+
+  function beginClauseEditingSession(target, durationMs = 2200) {
+    const version = activeClauseVersion();
+    if (!version || !target || !getClosest(target, "#clausesView")) return;
+    clauseEditingVersionId = version.id;
+    clauseEditingFieldKey = resolveClauseEditingFieldKey(target);
+    clauseEditingSessionUntil = Math.max(
+      clauseEditingSessionUntil,
+      Date.now() + Math.max(clauseEditorFreezeDuration(target), durationMs, 1800),
+    );
+    if (clauseEditingReleaseTimer) {
+      clearTimeout(clauseEditingReleaseTimer);
+      clauseEditingReleaseTimer = 0;
+    }
+  }
+
+  function clearClauseEditingSession(options = {}) {
+    if (!options.keepTimers && clauseEditingReleaseTimer) {
+      clearTimeout(clauseEditingReleaseTimer);
+      clauseEditingReleaseTimer = 0;
+    }
+    clauseEditingVersionId = "";
+    clauseEditingFieldKey = "";
+    clauseEditingSessionUntil = 0;
+    if (options.clearPending) pendingClauseViewRefresh = false;
+  }
+
+  function scheduleClauseEditingSessionRelease(delayMs = 320) {
+    if (clauseEditingReleaseTimer) clearTimeout(clauseEditingReleaseTimer);
+    clauseEditingReleaseTimer = window.setTimeout(() => {
+      clauseEditingReleaseTimer = 0;
+      releaseClauseEditingSessionIfIdle();
+    }, Math.max(160, delayMs));
+  }
+
+  function releaseClauseEditingSessionIfIdle() {
+    const version = activeClauseVersion();
+    if (!version) {
+      clearClauseEditingSession({ force: true, clearPending: true });
+      return;
+    }
+    if (isClauseEditorInteractionActive()) return;
+    const now = Date.now();
+    if (now < clauseEditingSessionUntil) {
+      scheduleClauseEditingSessionRelease(clauseEditingSessionUntil - now + 140);
+      return;
+    }
+    const shouldRefresh = pendingClauseViewRefresh;
+    clearClauseEditingSession();
+    if (shouldRefresh) {
+      renderClauses({ force: true, ignoreDefer: true });
+    }
+  }
+
+  function hasActiveClauseEditingSession(version) {
+    return Boolean(
+      version
+      && clauseEditingVersionId === version.id
+      && (Date.now() < clauseEditingSessionUntil || isClauseEditorInteractionActive())
+    );
+  }
+
+  function shouldDeferClauseViewRefresh(version) {
+    return Boolean(version && hasActiveClauseEditingSession(version));
+  }
+
+  function handleClauseEditorPointerDown(event) {
+    const duration = clauseEditorFreezeDuration(event.target);
+    if (!duration) return;
+    beginClauseEditingSession(event.target, duration);
+  }
+
+  function handleClauseEditorFocusIn(event) {
+    const duration = clauseEditorFreezeDuration(event.target);
+    if (!duration) return;
+    beginClauseEditingSession(event.target, duration);
+  }
+
+  function handleClauseEditorFocusOut(event) {
+    const nextTarget = event.relatedTarget;
+    if (nextTarget && getClosest(nextTarget, "#clausesView")) return;
+    pendingClauseViewRefresh = true;
+    captureClauseEditorDraftFromDom();
+    const releaseDelay = clauseEditorFreezeDuration(event.target) || 2200;
+    clauseEditingSessionUntil = Math.max(clauseEditingSessionUntil, Date.now() + Math.max(1400, releaseDelay));
+    scheduleClauseEditingSessionRelease(releaseDelay + 180);
+  }
+
+  function handleClauseEditorKeydown(event) {
+    const duration = clauseEditorFreezeDuration(event.target);
+    if (!duration) return;
+    beginClauseEditingSession(event.target, Math.max(duration, 6000));
   }
 
   function saveStore(announce, options = {}) {

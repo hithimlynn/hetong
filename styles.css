@@ -960,13 +960,13 @@ textarea:disabled {
 
 .clause-list {
   display: grid;
-  gap: 12px;
+  gap: 16px;
 }
 
 .clause-template-panel {
   display: grid;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 14px;
+  margin-bottom: 16px;
 }
 
 .clause-template-library {
@@ -989,6 +989,9 @@ textarea:disabled {
 .clause-template-list {
   display: grid;
   gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .clause-template-button {
@@ -1037,7 +1040,7 @@ textarea:disabled {
 }
 
 .clause-item {
-  padding: 12px;
+  padding: 16px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: #fbfcfe;
@@ -1056,8 +1059,10 @@ textarea:disabled {
 }
 
 .clause-textarea {
-  min-height: 132px;
-  line-height: 1.65;
+  min-height: 240px;
+  padding: 12px 14px;
+  line-height: 1.8;
+  resize: vertical;
 }
 
 #printRoot {
