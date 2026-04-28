@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260428-stats-period-select";
+  const BUILD_TAG = "20260428-one-time-payment-mode";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -75,6 +75,8 @@
     amountUpper: "au",
     promotionServiceFee: "psf",
     promotionServiceFeeUpper: "psu",
+    paymentMode: "pmd",
+    oneTimePaymentWorkdays: "otw",
     partyASignDate: "ad",
     partyASignature: "as",
   };
@@ -148,12 +150,23 @@
         { key: "amountUpper", label: "金额大写", readonly: true },
         { key: "promotionServiceFee", label: "一次性推广服务费", type: "number", required: true },
         { key: "promotionServiceFeeUpper", label: "推广服务费大写", readonly: true },
+        {
+          key: "paymentMode",
+          label: "支付方式",
+          type: "select",
+          options: [
+            { value: "installment", label: "分期付款" },
+            { value: "one_time", label: "一次性付款" },
+          ],
+          required: true,
+        },
         { key: "maintenanceDays", label: "发布后维护天数", type: "number", required: true },
         { key: "prepaymentWorkdays", label: "预付款工作日数", type: "number", required: true },
         { key: "prepaymentPercent", label: "预付款比例", type: "number", required: true },
         { key: "finalPaymentAfterPublishDays", label: "尾款发布后统计天数", type: "number", required: true },
         { key: "finalPaymentWorkdays", label: "尾款支付工作日数", type: "number", required: true },
         { key: "finalPaymentPercent", label: "尾款比例", type: "number", required: true },
+        { key: "oneTimePaymentWorkdays", label: "一次性付款时限", required: true },
         { key: "performanceMetric", label: "数据达标标准", type: "textarea", wide: true, required: true },
         { key: "deductionScenario", label: "扣付情形说明", type: "textarea", wide: true, required: true },
       ],
@@ -258,12 +271,14 @@
     amountUpper: "人民币叁佰元整",
     promotionServiceFee: "300",
     promotionServiceFeeUpper: "人民币叁佰元整",
+    paymentMode: "installment",
     maintenanceDays: "7天内",
     prepaymentWorkdays: "5个工作日内",
     prepaymentPercent: "50%",
     finalPaymentAfterPublishDays: "7天内",
     finalPaymentWorkdays: "10个工作日内",
     finalPaymentPercent: "50%",
+    oneTimePaymentWorkdays: "15~20个工作日内",
     performanceMetric: "点赞>__、评论>__",
     deductionScenario: "若乙方未按约定时间交稿 / 发布、内容违规被平台删除、数据造假（如刷赞、刷评论），甲方有权暂缓或拒绝支付尾款，同时要求乙方限期整改。数据不达标但无违规行为的情形，甲方可要求乙方进行二次补发或延长维护服务。",
     partyASignDate: "",
@@ -281,12 +296,14 @@
     sampleFeedbackNote: "样品反馈条文说明",
     promotionServiceFee: "一次性推广服务费",
     promotionServiceFeeUpper: "推广服务费大写",
+    paymentMode: "支付方式",
     maintenanceDays: "发布后维护周期",
     prepaymentWorkdays: "预付款支付时限",
     prepaymentPercent: "预付款比例",
     finalPaymentAfterPublishDays: "尾款数据统计周期",
     finalPaymentWorkdays: "尾款支付时限",
     finalPaymentPercent: "尾款比例",
+    oneTimePaymentWorkdays: "一次性付款时限",
     performanceMetric: "数据达标标准",
     deductionScenario: "扣付情形条文说明",
   };
@@ -302,12 +319,14 @@
     sampleFeedbackNote: "将更新到：三、档期与流程 > 样品反馈说明",
     promotionServiceFee: "将更新到：四、推广费用与支付 > 一次性推广服务费",
     promotionServiceFeeUpper: "将更新到：四、推广费用与支付 > 一次性推广服务费大写金额",
+    paymentMode: "将更新到：四、推广费用与支付 > 支付方式",
     maintenanceDays: "将更新到：四、推广费用与支付 > 发布后维护说明",
     prepaymentWorkdays: "将更新到：四、推广费用与支付 > 预付款条款",
     prepaymentPercent: "将更新到：四、推广费用与支付 > 预付款条款",
     finalPaymentAfterPublishDays: "将更新到：四、推广费用与支付 > 尾款条款",
     finalPaymentWorkdays: "将更新到：四、推广费用与支付 > 尾款条款",
     finalPaymentPercent: "将更新到：四、推广费用与支付 > 尾款条款",
+    oneTimePaymentWorkdays: "将更新到：四、推广费用与支付 > 一次性付款条款",
     performanceMetric: "将更新到：四、推广费用与支付 > 数据达标标准",
     deductionScenario: "将更新到：四、推广费用与支付 > 扣付情形",
   };
@@ -878,8 +897,9 @@
     }
     if (field.type === "select") {
       const options = (field.options || []).map((option) => {
-        const selected = String(option) === String(value) ? "selected" : "";
-        return `<option value="${escapeAttr(option)}" ${selected}>${escapeHtml(option)}</option>`;
+        const normalizedOption = normalizeSelectOption(option);
+        const selected = normalizedOption.value === String(value) ? "selected" : "";
+        return `<option value="${escapeAttr(normalizedOption.value)}" ${selected}>${escapeHtml(normalizedOption.label)}</option>`;
       }).join("");
       return `<select data-field-key="${field.key}" ${disabled}>${options}</select>`;
     }
@@ -913,6 +933,11 @@
 
   function handleFormClick(event) {
     beginAdminEditingSession(event.target, contractFormFreezeDuration(event.target) || 1800);
+    const paymentMode = getClosest(event.target, "[data-payment-mode-select]");
+    if (paymentMode) {
+      selectPaymentMode(paymentMode.dataset.paymentModeSelect || "");
+      return;
+    }
     const inlineToken = getClosest(event.target, "[data-inline-clause-token]");
     if (inlineToken) {
       openInlineClauseEditor(inlineToken.dataset.inlineClauseToken || "");
@@ -1028,6 +1053,16 @@
     renderMonthlyStats();
     renderPreview();
     renderForm({ force: true, ignoreDefer: true });
+  }
+
+  function normalizeSelectOption(option) {
+    if (option && typeof option === "object") {
+      const value = String(option.value == null ? "" : option.value).trim();
+      const label = String(option.label == null ? value : option.label).trim();
+      return { value, label: label || value };
+    }
+    const text = String(option == null ? "" : option).trim();
+    return { value: text, label: text };
   }
 
   function removeComboOption(fieldKey, value) {
@@ -1693,10 +1728,11 @@ function renderClauses(options = {}) {
   }
 
   function renderClauseSection(clause, fields = {}) {
+    const bodyLines = resolveDynamicClauseBody(clause, fields);
     return `
       <section class="doc-section">
         <h3>${escapeHtml(resolveClauseTemplateText(clause.title, fields))}</h3>
-        ${clause.body.map((line) => `<p>${escapeHtml(resolveClauseTemplateText(line, fields))}</p>`).join("")}
+        ${bodyLines.map((line) => `<p>${escapeHtml(resolveClauseTemplateText(line, fields))}</p>`).join("")}
       </section>
     `;
   }
@@ -1706,13 +1742,14 @@ function renderClauses(options = {}) {
     const resolvedTitle = resolveClauseTemplateText(clause.title, fields);
     const previewTitle = options.title || `${resolvedTitle}（预览）`;
     const previewLead = options.lead || "高亮内容会随上方字段实时变化。";
+    const bodyLines = resolveDynamicClauseBody(clause, fields);
     return `
       <article class="clause-item clause-preview-item">
         <div class="clause-preview-head">
           <h3>${escapeHtml(previewTitle)}</h3>
           <p>${escapeHtml(previewLead)}</p>
         </div>
-        ${clause.body.map((line) => `<p>${renderClausePreviewLine(line, fields)}</p>`).join("")}
+        ${bodyLines.map((line) => `<p>${renderClausePreviewLine(line, fields)}</p>`).join("")}
       </article>
     `;
   }
@@ -1741,10 +1778,12 @@ function renderClauses(options = {}) {
 
   function renderEditableDynamicClauseSection(clause, contract) {
     const fields = renderFields(contract) || getIn(contract, ["fields"]) || {};
+    const bodyLines = resolveDynamicClauseBody(clause, fields);
     return `
       <section class="doc-section doc-section-editable-clause">
         <h3>${escapeHtml(resolveClauseTemplateText(clause.title, fields))}</h3>
-        ${clause.body.map((line) => `<p>${renderEditableDynamicClauseLine(line, contract, fields)}</p>`).join("")}
+        ${isPaymentClauseTitle(clause.title) ? renderPaymentModeSwitcher(contract, fields) : ""}
+        ${bodyLines.map((line) => `<p>${renderEditableDynamicClauseLine(line, contract, fields)}</p>`).join("")}
       </section>
     `;
   }
@@ -1791,12 +1830,14 @@ function renderClauses(options = {}) {
       finalPublishDeadline: ["publishDate", "publishTime"],
       rescheduleNoticeHours: ["rescheduleNoticeHours"],
       serviceFee: ["promotionServiceFee"],
+      paymentModeLabel: ["paymentMode"],
       maintenanceDays: ["maintenanceDays"],
       prepaymentWorkdays: ["prepaymentWorkdays"],
       prepaymentPercent: ["prepaymentPercent"],
       finalPaymentAfterPublishDays: ["finalPaymentAfterPublishDays"],
       finalPaymentWorkdays: ["finalPaymentWorkdays"],
       finalPaymentPercent: ["finalPaymentPercent"],
+      oneTimePaymentWorkdays: ["oneTimePaymentWorkdays"],
       performanceMetric: ["performanceMetric"],
       deductionScenario: ["deductionScenario"],
     };
@@ -1822,6 +1863,14 @@ function renderClauses(options = {}) {
     const value = contract.fields[fieldKey] || "";
     if (field.type === "textarea") {
       return `<textarea class="inline-clause-editor-control is-textarea" data-field-key="${field.key}" rows="3">${escapeHtml(value)}</textarea>`;
+    }
+    if (field.type === "select") {
+      const options = (field.options || []).map((option) => {
+        const normalizedOption = normalizeSelectOption(option);
+        const selected = normalizedOption.value === String(value) ? "selected" : "";
+        return `<option value="${escapeAttr(normalizedOption.value)}" ${selected}>${escapeHtml(normalizedOption.label)}</option>`;
+      }).join("");
+      return `<select class="inline-clause-editor-control" data-field-key="${field.key}">${options}</select>`;
     }
     return `
       <input
@@ -1852,6 +1901,7 @@ function renderClauses(options = {}) {
       rescheduleNoticeHours: formatHourText(fields.rescheduleNoticeHours),
       serviceFee: formatMoney(serviceFeeBase),
       serviceFeeUpper: fields.promotionServiceFeeUpper || moneyToChinese(serviceFeeBase) || DEFAULT_FIELDS.promotionServiceFeeUpper,
+      paymentModeLabel: paymentModeLabel(fields.paymentMode),
       maintenanceDays: normalizeDurationText(fields.maintenanceDays, "天内"),
       prepaymentWorkdays: formatWorkdayText(fields.prepaymentWorkdays),
       prepaymentPercent: formatPercentText(fields.prepaymentPercent),
@@ -1860,10 +1910,92 @@ function renderClauses(options = {}) {
       finalPaymentWorkdays: formatWorkdayText(fields.finalPaymentWorkdays),
       finalPaymentPercent: formatPercentText(fields.finalPaymentPercent),
       finalPaymentAmount: formatMoney(calculatePercentAmount(serviceFeeBase, fields.finalPaymentPercent)),
+      oneTimePaymentWorkdays: formatWorkdayText(fields.oneTimePaymentWorkdays),
       performanceMetric: fields.performanceMetric || DEFAULT_FIELDS.performanceMetric,
       deductionScenario: fields.deductionScenario || DEFAULT_FIELDS.deductionScenario,
     };
     return values[token] || "";
+  }
+
+  function resolveDynamicClauseBody(clause, fields = {}) {
+    if (isPaymentClauseTitle(clause && clause.title)) {
+      return buildPaymentClauseBody(fields);
+    }
+    return Array.isArray(clause && clause.body) ? clause.body : [];
+  }
+
+  function buildPaymentClauseBody(fields = {}) {
+    const paymentMode = normalizePaymentMode(fields.paymentMode);
+    const body = [
+      "（一）费用构成",
+      "一次性推广服务费：人民币{{serviceFee}}（大写：{{serviceFeeUpper}}），包含内容创作、修改、发布及发布后{{maintenanceDays}}评论维护服务，其他额外费用另算。",
+      "样品处理：样品为合作道具，合作结束后归乙方所有。",
+      "（二）支付方式",
+    ];
+    if (paymentMode === "one_time") {
+      body.push("一次性付款：乙方按约定时间完成内容发布后{{oneTimePaymentWorkdays}}，甲方一次性支付推广服务费（即人民币{{serviceFee}}）。");
+    } else {
+      body.push("预付款：本合同签订后{{prepaymentWorkdays}}，甲方支付服务费的{{prepaymentPercent}}（即人民币{{prepaymentAmount}}）作为履约保证金；");
+      body.push("尾款：乙方按约定时间完成内容发布，且发布后{{finalPaymentAfterPublishDays}}内数据达标（达标标准：{{performanceMetric}}），后{{finalPaymentWorkdays}}内，甲方支付剩余{{finalPaymentPercent}}服务费（即人民币{{finalPaymentAmount}}）；");
+    }
+    body.push("扣付情形：{{deductionScenario}}");
+    return body;
+  }
+
+  function isPaymentClauseTitle(title) {
+    const text = String(title || "").trim();
+    return text === "四、推广费用与支付";
+  }
+
+  function paymentModeLabel(value) {
+    return normalizePaymentMode(value) === "one_time" ? "一次性付款" : "分期付款";
+  }
+
+  function normalizePaymentMode(value) {
+    return String(value || "").trim() === "one_time" ? "one_time" : "installment";
+  }
+
+  function renderPaymentModeSwitcher(contract, fields = {}) {
+    const currentMode = normalizePaymentMode(fields.paymentMode);
+    const canEdit = contract && contract.status === "draft";
+    const options = [
+      { value: "installment", label: "分期付款" },
+      { value: "one_time", label: "一次性付款" },
+    ];
+    return `
+      <div class="payment-mode-switcher" data-payment-mode-switcher>
+        <span class="payment-mode-label">支付方式</span>
+        <div class="payment-mode-actions">
+          ${options.map((option) => {
+            const active = option.value === currentMode;
+            if (!canEdit) {
+              return `<span class="payment-mode-chip${active ? " is-active" : ""}">${escapeHtml(option.label)}</span>`;
+            }
+            return `
+              <button
+                class="payment-mode-chip${active ? " is-active" : ""}"
+                type="button"
+                data-payment-mode-select="${escapeAttr(option.value)}"
+              >${escapeHtml(option.label)}</button>
+            `;
+          }).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  function selectPaymentMode(mode) {
+    const contract = currentContract();
+    if (!contract || contract.status !== "draft") return;
+    const nextMode = normalizePaymentMode(mode);
+    if (normalizePaymentMode(contract.fields.paymentMode) === nextMode) return;
+    beginAdminEditingSession(document.getElementById("contractForm"), 6000);
+    contract.fields.paymentMode = nextMode;
+    contract.updatedAt = nowIso();
+    saveStore(true);
+    renderForm({ force: true, ignoreDefer: true });
+    renderContractList();
+    renderMonthlyStats();
   }
 
   function formatClauseDeadline(dateValue, timeValue) {
@@ -2424,7 +2556,7 @@ function renderClauses(options = {}) {
     const errors = [];
     FIELD_GROUPS.forEach((group) => {
       group.fields.forEach((field) => {
-        if (!field.required) return;
+        if (!field.required || !isFieldRequiredForContract(field.key, contract.fields)) return;
         if (!String(contract.fields[field.key] || "").trim()) {
           errors.push(`${field.label}不能为空`);
         }
@@ -2433,6 +2565,24 @@ function renderClauses(options = {}) {
     if (Number(contract.fields.price) <= 0) errors.push("价格必须大于 0");
     if (Number(promotionServiceFeeValue(contract.fields)) <= 0) errors.push("一次性推广服务费必须大于 0");
     return errors;
+  }
+
+  function isFieldRequiredForContract(fieldKey, fields = {}) {
+    const paymentMode = normalizePaymentMode(fields.paymentMode);
+    if (paymentMode === "one_time") {
+      return ![
+        "prepaymentWorkdays",
+        "prepaymentPercent",
+        "finalPaymentAfterPublishDays",
+        "finalPaymentWorkdays",
+        "finalPaymentPercent",
+        "performanceMetric",
+      ].includes(fieldKey);
+    }
+    if (paymentMode === "installment") {
+      return fieldKey !== "oneTimePaymentWorkdays";
+    }
+    return true;
   }
 
   function setupSignatureCanvas() {
@@ -2813,6 +2963,7 @@ function renderClauses(options = {}) {
     if (!fields.sampleShippingInfo) fields.sampleShippingInfo = DEFAULT_FIELDS.sampleShippingInfo;
     if (fields.sampleShippingInfo === "寄样") fields.sampleShippingInfo = "已寄样";
     if (fields.sampleShippingInfo === "不寄样" || fields.sampleShippingInfo === "待确认") fields.sampleShippingInfo = "未寄样";
+    fields.paymentMode = normalizePaymentMode(rawFields.paymentMode || fields.paymentMode);
     fields.amountUpper = moneyToChinese(fields.price) || fields.amountUpper || DEFAULT_FIELDS.amountUpper;
     if (!Object.prototype.hasOwnProperty.call(rawFields, "promotionServiceFee")) {
       fields.promotionServiceFee = fields.price || DEFAULT_FIELDS.price;
@@ -2820,6 +2971,7 @@ function renderClauses(options = {}) {
     fields.promotionServiceFeeUpper = moneyToChinese(fields.promotionServiceFee)
       || fields.promotionServiceFeeUpper
       || DEFAULT_FIELDS.promotionServiceFeeUpper;
+    fields.oneTimePaymentWorkdays = String(fields.oneTimePaymentWorkdays || DEFAULT_FIELDS.oneTimePaymentWorkdays).trim() || DEFAULT_FIELDS.oneTimePaymentWorkdays;
     const snapshot = normalizeSnapshot(contract.snapshot, fields, contract.status);
     const status = String(contract.status || "draft").trim().toLowerCase();
     return {
@@ -2873,6 +3025,8 @@ function renderClauses(options = {}) {
         partyBPhone: rawSnapshotFields.partyBPhone || rawSnapshotFields.phone || fields.partyBPhone,
         retentionDate: rawSnapshotFields.retentionDate || normalizeDateLike(rawSnapshotFields.retentionPeriod) || fields.retentionDate,
         sampleShippingInfo: rawSnapshotFields.sampleShippingInfo || fields.sampleShippingInfo,
+        paymentMode: normalizePaymentMode(rawSnapshotFields.paymentMode || fields.paymentMode),
+        oneTimePaymentWorkdays: rawSnapshotFields.oneTimePaymentWorkdays || fields.oneTimePaymentWorkdays,
         partyASignDate: rawSnapshotFields.partyASignDate || fields.partyASignDate,
         partyASignature: rawSnapshotFields.partyASignature || fields.partyASignature,
       },
@@ -3346,8 +3500,12 @@ function renderClauses(options = {}) {
     const fields = renderFields(contract) || getIn(contract, ["fields"]) || {};
     const version = activeClauseVersion();
     const baseSections = version && Array.isArray(version.sections) ? version.sections : DEFAULT_CLAUSES;
+    const dynamicSections = clone(DEFAULT_CLAUSES.slice(0, 2)).map((clause) => ({
+      ...clause,
+      body: resolveDynamicClauseBody(clause, fields),
+    }));
     return [
-      ...clone(DEFAULT_CLAUSES.slice(0, 2)),
+      ...dynamicSections,
       ...normalizeTailClauseSections(baseSections, DEFAULT_CLAUSES.slice(2)),
     ].map((clause) => ({
       title: resolveClauseTemplateText(clause.title, fields),

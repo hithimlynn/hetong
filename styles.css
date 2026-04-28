@@ -1294,6 +1294,52 @@ textarea:disabled {
   outline: none;
 }
 
+.payment-mode-switcher {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 8px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.payment-mode-label {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.payment-mode-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.payment-mode-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid #cfd8e6;
+  border-radius: 999px;
+  background: #fff;
+  color: #475569;
+  font: inherit;
+  cursor: pointer;
+}
+
+.payment-mode-chip.is-active {
+  border-color: rgba(37, 99, 235, 0.22);
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
 .inline-clause-editor {
   display: inline-flex;
   align-items: center;
