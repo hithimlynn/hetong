@@ -1163,6 +1163,13 @@ textarea:disabled {
   padding-right: 4px;
 }
 
+.clause-template-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
 .clause-template-button {
   width: 100%;
   border: 1px solid var(--line);
@@ -1206,6 +1213,19 @@ textarea:disabled {
 .clause-template-meta {
   color: #607086;
   font-size: 12px;
+}
+
+.clause-template-delete {
+  min-width: 64px;
+  padding: 0 10px;
+  border: 1px solid #edc5c5;
+  border-radius: 6px;
+  background: #fff7f7;
+  color: var(--danger);
+}
+
+.clause-template-delete:hover:not(:disabled) {
+  background: #ffecec;
 }
 
 .clause-item {

@@ -1373,19 +1373,30 @@
 
 function renderClauses(options = {}) {
     const version = activeClauseVersion();
+    const templateOptions = normalizedClauseTemplateOptions();
+    const canDeleteTemplate = templateOptions.length > 1;
     document.getElementById("clauseMeta").textContent = `${version.version} · ${formatDateTime(version.updatedAt)} · ${version.maintainer}`;
-    document.getElementById("clauseTemplateList").innerHTML = normalizedClauseTemplateOptions().map((item) => `
-      <button
-        class="clause-template-button${item.id === version.id ? " is-active" : ""}"
-        type="button"
-        data-clause-template-id="${escapeAttr(item.id)}"
-      >
-        <span class="clause-template-title">
-          <strong>${escapeHtml(item.version)}</strong>
-          ${item.id === version.id ? '<span class="clause-template-badge">当前默认模板</span>' : ""}
-        </span>
-        <span class="clause-template-meta">${escapeHtml(formatDateTime(item.updatedAt))} · ${escapeHtml(item.maintainer)}</span>
-      </button>
+    document.getElementById("clauseTemplateList").innerHTML = templateOptions.map((item) => `
+      <div class="clause-template-row${item.id === version.id ? " is-active" : ""}">
+        <button
+          class="clause-template-button${item.id === version.id ? " is-active" : ""}"
+          type="button"
+          data-clause-template-id="${escapeAttr(item.id)}"
+        >
+          <span class="clause-template-title">
+            <strong>${escapeHtml(item.version)}</strong>
+            ${item.id === version.id ? '<span class="clause-template-badge">当前默认模板</span>' : ""}
+          </span>
+          <span class="clause-template-meta">${escapeHtml(formatDateTime(item.updatedAt))} · ${escapeHtml(item.maintainer)}</span>
+        </button>
+        <button
+          class="clause-template-delete"
+          type="button"
+          data-clause-template-delete="${escapeAttr(item.id)}"
+          ${canDeleteTemplate ? "" : "disabled"}
+          title="${canDeleteTemplate ? "删除模板" : "至少保留一份模板"}"
+        >删除</button>
+      </div>
     `).join("");
     renderClauseEditorContent(version, options);
     return;
@@ -1457,6 +1468,11 @@ function renderClauses(options = {}) {
       addClauseTemplateSection();
       return;
     }
+    const deleteButton = getClosest(event.target, "[data-clause-template-delete]");
+    if (deleteButton) {
+      deleteClauseTemplate(deleteButton.dataset.clauseTemplateDelete || "");
+      return;
+    }
     const button = getClosest(event.target, "[data-clause-template-id]");
     if (!button) return;
     const versionId = String(button.dataset.clauseTemplateId || "").trim();
@@ -1469,6 +1485,38 @@ function renderClauses(options = {}) {
     renderTopState();
     const next = activeClauseVersion();
     document.getElementById("syncState").textContent = `已切换默认模板 ${next.version}`;
+  }
+
+  function deleteClauseTemplate(templateId) {
+    const targetId = String(templateId || "").trim();
+    if (!targetId) return;
+    const versions = normalizeClauseVersions(store.clauseVersions);
+    if (versions.length <= 1) {
+      document.getElementById("syncState").textContent = "至少保留一份模板";
+      return;
+    }
+    const target = versions.find((item) => item.id === targetId);
+    if (!target) return;
+    if (!window.confirm(`确认删除模板“${target.version}”？已发布合同不会受影响。`)) return;
+    captureClauseEditorDraftFromDom();
+    const remaining = versions.filter((item) => item.id !== targetId);
+    store.clauseVersions = remaining;
+    clauseEditorDraftByVersionId.delete(targetId);
+    const deletingActive = store.activeClauseVersionId === targetId;
+    if (deletingActive) {
+      const fallback = remaining
+        .slice()
+        .sort((left, right) => latestTimestamp([right.updatedAt]) - latestTimestamp([left.updatedAt]))[0];
+      store.activeClauseVersionId = fallback ? fallback.id : "";
+      clearClauseEditingSession({ force: true, clearPending: true });
+    }
+    saveStore(true, { reason: "delete-clause-template", immediate: true });
+    renderClauses({ force: true, ignoreDefer: true });
+    renderTopState();
+    const activeVersion = activeClauseVersion();
+    document.getElementById("syncState").textContent = deletingActive
+      ? `已删除模板 ${target.version}，已切换到 ${activeVersion.version}`
+      : `已删除模板 ${target.version}`;
   }
 
   function addClauseTemplateSection() {
