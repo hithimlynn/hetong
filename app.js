@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260428-sidebar-filter-ui-refresh";
+  const BUILD_TAG = "20260428-flow-payment-fields";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -19,8 +19,8 @@
   const SIGNER_LOAD_CACHE_MS = 10000;
   const REMOTE_SAVE_RETRY_LIMIT = 3;
   const CONTRACT_TITLE = "达人内容发布合作协议";
-  const CLAUSE_SEED_VERSION = "wlead-pdf-2026-04-27-settlement";
-  const CLAUSE_SEED_LABEL = "PDF基准 V2026.04.27";
+  const CLAUSE_SEED_VERSION = "wlead-template-2026-04-28-flow-payment";
+  const CLAUSE_SEED_LABEL = "PDF基准 V2026.04.28";
   const DEFAULT_BRAND_OPTIONS = ["Wlead"];
   const DEFAULT_PLATFORM_OPTIONS = ["小红书", "抖音", "bilibili", "公众号"];
   const INSTANCE_ID = randomToken(8);
@@ -48,6 +48,22 @@
     sampleShippingInfo: "ss",
     firstReviewDate: "fr",
     finalReviewDate: "tr",
+    draftSubmitDeadlineDate: "dsd",
+    draftSubmitDeadlineTime: "dst",
+    reviewContact: "rc",
+    reviewFeedbackWorkdays: "rfw",
+    sampleFeedbackNote: "sfn",
+    finalRevisionWorkdays: "frw",
+    publishTime: "pt",
+    rescheduleNoticeHours: "rnh",
+    maintenanceDays: "md",
+    prepaymentWorkdays: "ppw",
+    prepaymentPercent: "ppp",
+    finalPaymentAfterPublishDays: "fpd",
+    finalPaymentWorkdays: "fpw",
+    finalPaymentPercent: "fpp",
+    performanceMetric: "pm",
+    deductionScenario: "dc",
     publishDate: "pd",
     retentionDate: "rd",
     partyAProvided: "ap",
@@ -96,8 +112,6 @@
           options: ["已寄样", "未寄样"],
           required: true,
         },
-        { key: "firstReviewDate", label: "初稿时间", type: "date", required: true },
-        { key: "finalReviewDate", label: "终稿时间", type: "date", required: true },
         { key: "publishDate", label: "发布时间", type: "date", required: true },
         {
           key: "retentionDate",
@@ -109,10 +123,31 @@
       ],
     },
     {
-      title: "费用结算",
+      title: "档期与流程设置",
+      fields: [
+        { key: "draftSubmitDeadlineDate", label: "初稿提交截止日期", type: "date", required: true },
+        { key: "draftSubmitDeadlineTime", label: "初稿提交截止时间", type: "time", required: true },
+        { key: "reviewContact", label: "甲方指定联系人", required: true },
+        { key: "reviewFeedbackWorkdays", label: "审核反馈工作日数", type: "number", required: true },
+        { key: "finalRevisionWorkdays", label: "终稿修改工作日数", type: "number", required: true },
+        { key: "publishTime", label: "最终发布时间", type: "time", required: true },
+        { key: "rescheduleNoticeHours", label: "调整提前通知小时数", type: "number", required: true },
+        { key: "sampleFeedbackNote", label: "样品反馈说明", type: "textarea", wide: true, required: true },
+      ],
+    },
+    {
+      title: "推广费用与支付设置",
       fields: [
         { key: "price", label: "价格", type: "number", required: true },
         { key: "amountUpper", label: "金额大写", readonly: true },
+        { key: "maintenanceDays", label: "发布后维护天数", type: "number", required: true },
+        { key: "prepaymentWorkdays", label: "预付款工作日数", type: "number", required: true },
+        { key: "prepaymentPercent", label: "预付款比例", type: "number", required: true },
+        { key: "finalPaymentAfterPublishDays", label: "尾款发布后统计天数", type: "number", required: true },
+        { key: "finalPaymentWorkdays", label: "尾款支付工作日数", type: "number", required: true },
+        { key: "finalPaymentPercent", label: "尾款比例", type: "number", required: true },
+        { key: "performanceMetric", label: "数据达标标准", type: "textarea", wide: true, required: true },
+        { key: "deductionScenario", label: "扣付情形说明", type: "textarea", wide: true, required: true },
       ],
     },
     {
@@ -127,7 +162,30 @@
 
   const DEFAULT_CLAUSES = [
     {
-      title: "三、权利义务",
+      title: "三、档期与流程",
+      body: [
+        "（一）关键时间节点：",
+        "内容初稿提交时间：乙方需在{{draftSubmitDeadline}}，将推广内容初稿（含文案、图片 / 视频素材）提交至甲方指定联系人{{reviewContact}}；",
+        "甲方审核反馈时间：甲方收到初稿后{{reviewFeedbackWorkdays}}，需向乙方出具审核意见，逾期未反馈视为初稿合格；",
+        "{{sampleFeedbackNote}}",
+        "最终内容确认时间：若需修改，乙方需根据甲方意见在{{finalRevisionWorkdays}}完成修改并提交终稿，终稿经甲方书面确认后，乙方需在{{finalPublishDeadline}}完成{{publishPlatform}}平台发布；",
+        "调整限制：乙方因特殊原因需要更改投稿或发布时间的，需提前{{rescheduleNoticeHours}}向甲方提交书面申请，经甲方确认后方可调整，未经同意不得擅自变更。",
+      ],
+    },
+    {
+      title: "四、推广费用与支付",
+      body: [
+        "（一）费用构成",
+        "一次性推广服务费：人民币{{serviceFee}}（大写：{{serviceFeeUpper}}），包含内容创作、修改、发布及发布后{{maintenanceDays}}评论维护服务，其他额外费用另算。",
+        "样品处理：样品为合作道具，合作结束后归乙方所有。",
+        "（二）支付方式",
+        "预付款：本合同签订后{{prepaymentWorkdays}}，甲方支付服务费的{{prepaymentPercent}}（即人民币{{prepaymentAmount}}）作为履约保证金；",
+        "尾款：乙方按约定时间完成内容发布，且发布后{{finalPaymentAfterPublishDays}}内数据达标（达标标准：{{performanceMetric}}），后{{finalPaymentWorkdays}}内，甲方支付剩余{{finalPaymentPercent}}服务费（即人民币{{finalPaymentAmount}}）；",
+        "扣付情形：{{deductionScenario}}",
+      ],
+    },
+    {
+      title: "五、权利义务",
       body: [
         "1、甲方权利义务",
         "（1）本次合作内容制作具体要求，甲方应按照约定时间及时以书面形式发送给乙方，并保证各项内容要求符合相关法规，内容制作过程中为更高效完成创作，相应修改应及时总结告知乙方，且修改次数为（两次）",
@@ -145,7 +203,7 @@
       ],
     },
     {
-      title: "四、违约责任",
+      title: "六、违约责任",
       body: [
         "1、若乙方因自行策划内容出现知识产权侵权引起第三方追索或要求赔偿，由乙方承担责任。",
         "2、若甲方因定制内容有知识产权侵权引起第三方追索或要求赔偿，由甲方承担责任。",
@@ -153,7 +211,7 @@
       ],
     },
     {
-      title: "五、争议解决",
+      title: "七、争议解决",
       body: [
         "1、因本协议订立、履行、解释所产生的任何争议适用中华人民共和国法律。",
         "2、因本协议订立、履行、解释所产生的任何争议首先由双方友好协商解决，协商不能解决的，任何一方均有权向履约方所在地人民法院提起诉讼。",
@@ -162,7 +220,7 @@
       ],
     },
     {
-      title: "六、协议的变更及生效",
+      title: "八、协议的变更及生效",
       body: [
         "1、本协议壹式贰份，甲乙双方各持壹份，自双方签字或盖章之日起发生法律效力。",
         "2、协议中未尽事宜，经双方协商一致，可以签订书面补充协议，补充协议与本协议不一致的，以补充协议为准。本协议部分条款的无效或效力待定不影响其他条款的执行",
@@ -177,13 +235,27 @@
     creatorName: "一只允沫",
     partyBPhone: "13800000000",
     sampleShippingInfo: "未寄样",
-    firstReviewDate: "2026-04-25",
-    finalReviewDate: "2026-04-27",
+    draftSubmitDeadlineDate: "2026-04-25",
+    draftSubmitDeadlineTime: "18:00",
+    reviewContact: "18275785921",
+    reviewFeedbackWorkdays: "1",
+    sampleFeedbackNote: "收到样品后乙方需及时反馈给甲方，确认样品无损坏，样品问题不得影响初稿提交。",
+    finalRevisionWorkdays: "1",
     publishDate: "2026-04-30",
+    publishTime: "19:00",
+    rescheduleNoticeHours: "48小时",
     retentionDate: "2026-07-30",
     partyAProvided: "品牌资料、拍摄要求、审核反馈、禁用词和发布注意事项。",
     price: "300",
     amountUpper: "人民币叁佰元整",
+    maintenanceDays: "7天内",
+    prepaymentWorkdays: "5个工作日内",
+    prepaymentPercent: "50%",
+    finalPaymentAfterPublishDays: "7天内",
+    finalPaymentWorkdays: "10个工作日内",
+    finalPaymentPercent: "50%",
+    performanceMetric: "点赞>__、评论>__",
+    deductionScenario: "若乙方未按约定时间交稿 / 发布、内容违规被平台删除、数据造假（如刷赞、刷评论），甲方有权暂缓或拒绝支付尾款，同时要求乙方限期整改。数据不达标但无违规行为的情形，甲方可要求乙方进行二次补发或延长维护服务。",
     partyASignDate: "",
     partyASignature: "",
   };
@@ -1189,7 +1261,7 @@ function renderClauses(options = {}) {
     document.getElementById("syncState").textContent = `${syncLabel} · ${status}`;
   }
 
-  function renderEditableContractDocument(contract) {
+function renderEditableContractDocument(contract) {
     if (contract.status !== "draft") return renderContractDocument(contract);
     const fields = contract.fields;
     const clauses = activeClauseVersion().sections;
@@ -1208,8 +1280,6 @@ function renderClauses(options = {}) {
               ${editable("platformAccount")}
               ${editable("partyBPhone")}
               ${editable("sampleShippingInfo")}
-              ${editable("firstReviewDate")}
-              ${editable("finalReviewDate")}
               ${editable("publishDate")}
               ${editable("retentionDate")}
             </div>
@@ -1222,7 +1292,33 @@ function renderClauses(options = {}) {
               ${editable("amountUpper")}
             </div>
           </section>
-          ${clauses.map(renderClauseSection).join("")}
+          <section class="editable-block">
+            <h3>三、档期与流程设置</h3>
+            <div class="embedded-grid two-col">
+              ${editable("draftSubmitDeadlineDate")}
+              ${editable("draftSubmitDeadlineTime")}
+              ${editable("reviewContact")}
+              ${editable("reviewFeedbackWorkdays")}
+              ${editable("finalRevisionWorkdays")}
+              ${editable("publishTime")}
+              ${editable("rescheduleNoticeHours")}
+            </div>
+            ${editable("sampleFeedbackNote")}
+          </section>
+          <section class="editable-block">
+            <h3>四、推广费用与支付设置</h3>
+            <div class="embedded-grid two-col">
+              ${editable("maintenanceDays")}
+              ${editable("prepaymentWorkdays")}
+              ${editable("prepaymentPercent")}
+              ${editable("finalPaymentAfterPublishDays")}
+              ${editable("finalPaymentWorkdays")}
+              ${editable("finalPaymentPercent")}
+            </div>
+            ${editable("performanceMetric")}
+            ${editable("deductionScenario")}
+          </section>
+          ${clauses.map((clause) => renderClauseSection(clause, fields)).join("")}
           <section class="editable-block signature-edit-block">
             <h3>甲方签署</h3>
             <div class="embedded-grid two-col">
@@ -1263,10 +1359,11 @@ function renderClauses(options = {}) {
     `;
   }
 
-  function renderContractDocument(contract) {
+function renderContractDocument(contract) {
     const fields = renderFields(contract) || getIn(contract, ["fields"]) || {};
     const clauses = renderClausesForContract(contract);
     const watermark = formatContractWatermark(fields.brand);
+    const showLegacyReviewRow = !fields.draftSubmitDeadlineDate && (fields.firstReviewDate || fields.finalReviewDate || fields.reviewDate);
     return `
       <article class="contract-document">
         ${renderContractPageShell(watermark, `
@@ -1277,7 +1374,7 @@ function renderClauses(options = {}) {
               <tr><th>品牌</th><td>${escapeHtml(fields.brand || "-")}</td><th>博主名称</th><td>${escapeHtml(fields.creatorName || "-")}</td></tr>
               <tr><th>平台</th><td>${escapeHtml(fields.platform || "-")}</td><th>账号</th><td>${escapeHtml(fields.platformAccount || "-")}</td></tr>
               <tr><th>联系电话</th><td>${escapeHtml(fields.partyBPhone || "-")}</td><th>寄样信息</th><td>${escapeHtml(fields.sampleShippingInfo || "-")}</td></tr>
-              <tr><th>初稿时间</th><td>${escapeHtml(formatDateCn(fields.firstReviewDate || fields.reviewDate) || "-")}</td><th>终稿时间</th><td>${escapeHtml(formatDateCn(fields.finalReviewDate || fields.reviewDate) || "-")}</td></tr>
+              ${showLegacyReviewRow ? `<tr><th>初稿时间</th><td>${escapeHtml(formatDateCn(fields.firstReviewDate || fields.reviewDate) || "-")}</td><th>终稿时间</th><td>${escapeHtml(formatDateCn(fields.finalReviewDate || fields.reviewDate) || "-")}</td></tr>` : ""}
               <tr><th>发布时间</th><td>${escapeHtml(formatDateCn(fields.publishDate) || "-")}</td><th>保留时间</th><td>${escapeHtml(formatRetentionDate(fields.retentionDate || fields.retentionPeriod) || "-")}</td></tr>
               <tr><th>甲方提供</th><td colspan="3">${escapeHtml(fields.partyAProvided || "-")}</td></tr>
             </table>
@@ -1288,20 +1385,102 @@ function renderClauses(options = {}) {
               <tr><th>价格</th><td>${escapeHtml(formatMoney(fields.price))}</td><th>金额大写</th><td>${escapeHtml(fields.amountUpper || "-")}</td></tr>
             </table>
           </section>
-          ${clauses.map(renderClauseSection).join("")}
+          ${clauses.map((clause) => renderClauseSection(clause, fields)).join("")}
           ${renderSignatureBlock(contract, fields)}
         `)}
       </article>
     `;
   }
 
-  function renderClauseSection(clause) {
+  function renderClauseSection(clause, fields = {}) {
     return `
       <section class="doc-section">
-        <h3>${escapeHtml(clause.title)}</h3>
-        ${clause.body.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
+        <h3>${escapeHtml(resolveClauseTemplateText(clause.title, fields))}</h3>
+        ${clause.body.map((line) => `<p>${escapeHtml(resolveClauseTemplateText(line, fields))}</p>`).join("")}
       </section>
     `;
+  }
+
+  function resolveClauseTemplateText(text, fields = {}) {
+    const value = String(text || "");
+    return value.replace(/\{\{([a-zA-Z0-9_]+)\}\}/g, (_, token) => clauseTemplateValue(token, fields));
+  }
+
+  function clauseTemplateValue(token, fields = {}) {
+    const values = {
+      draftSubmitDeadline: formatClauseDeadline(fields.draftSubmitDeadlineDate, fields.draftSubmitDeadlineTime),
+      reviewContact: formatWrappedText(fields.reviewContact),
+      reviewFeedbackWorkdays: formatWorkdayText(fields.reviewFeedbackWorkdays),
+      sampleFeedbackNote: fields.sampleFeedbackNote || DEFAULT_FIELDS.sampleFeedbackNote,
+      finalRevisionWorkdays: formatWorkdayText(fields.finalRevisionWorkdays),
+      finalPublishDeadline: formatClauseDeadline(fields.publishDate, fields.publishTime),
+      publishPlatform: fields.platform || DEFAULT_FIELDS.platform,
+      rescheduleNoticeHours: formatHourText(fields.rescheduleNoticeHours),
+      serviceFee: formatMoney(fields.price),
+      serviceFeeUpper: fields.amountUpper || moneyToChinese(fields.price) || DEFAULT_FIELDS.amountUpper,
+      maintenanceDays: normalizeDurationText(fields.maintenanceDays, "天内"),
+      prepaymentWorkdays: formatWorkdayText(fields.prepaymentWorkdays),
+      prepaymentPercent: formatPercentText(fields.prepaymentPercent),
+      prepaymentAmount: formatMoney(calculatePercentAmount(fields.price, fields.prepaymentPercent)),
+      finalPaymentAfterPublishDays: normalizeDurationText(fields.finalPaymentAfterPublishDays, "天内"),
+      finalPaymentWorkdays: formatWorkdayText(fields.finalPaymentWorkdays),
+      finalPaymentPercent: formatPercentText(fields.finalPaymentPercent),
+      finalPaymentAmount: formatMoney(calculatePercentAmount(fields.price, fields.finalPaymentPercent)),
+      performanceMetric: fields.performanceMetric || DEFAULT_FIELDS.performanceMetric,
+      deductionScenario: fields.deductionScenario || DEFAULT_FIELDS.deductionScenario,
+    };
+    return values[token] || "";
+  }
+
+  function formatClauseDeadline(dateValue, timeValue) {
+    const dateText = formatDateCn(dateValue) || "";
+    const timeText = normalizeTimeText(timeValue);
+    if (dateText && timeText) return `【${dateText}${timeText}前】`;
+    if (dateText) return `【${dateText}前】`;
+    if (timeText) return `【${timeText}前】`;
+    return "【待甲方填写】";
+  }
+
+  function formatWrappedText(value) {
+    const text = String(value || "").trim();
+    return text ? `【${text}】` : "【待甲方填写】";
+  }
+
+  function normalizeTimeText(value) {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    const match = text.match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return text;
+    const [, hour, minute] = match;
+    return `${Number(hour)}时${minute === "00" ? "" : minute.padStart(2, "0")}分`;
+  }
+
+  function normalizeDurationText(value, suffix = "") {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    return /天|小时|工作日|%/.test(text) ? text : `${text}${suffix}`;
+  }
+
+  function formatWorkdayText(value) {
+    return normalizeDurationText(value, "个工作日内") || "待甲方填写";
+  }
+
+  function formatHourText(value) {
+    return normalizeDurationText(value, "小时") || "待甲方填写";
+  }
+
+  function formatPercentText(value) {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    return text.includes("%") ? text : `${text}%`;
+  }
+
+  function calculatePercentAmount(price, percent) {
+    const amount = Number(price || 0);
+    const ratioText = String(percent || "").replace(/%/g, "").trim();
+    const ratio = Number(ratioText);
+    if (!Number.isFinite(amount) || !Number.isFinite(ratio)) return 0;
+    return Math.round((amount * ratio) * 100) / 10000;
   }
 
   function renderSignatureBlock(contract, fields) {
@@ -2165,7 +2344,8 @@ function renderClauses(options = {}) {
     if (!fields.sampleShippingInfo) fields.sampleShippingInfo = DEFAULT_FIELDS.sampleShippingInfo;
     if (fields.sampleShippingInfo === "寄样") fields.sampleShippingInfo = "已寄样";
     if (fields.sampleShippingInfo === "不寄样" || fields.sampleShippingInfo === "待确认") fields.sampleShippingInfo = "未寄样";
-    const snapshot = normalizeSnapshot(contract.snapshot, fields);
+    fields.amountUpper = moneyToChinese(fields.price) || fields.amountUpper || DEFAULT_FIELDS.amountUpper;
+    const snapshot = normalizeSnapshot(contract.snapshot, fields, contract.status);
     const status = String(contract.status || "draft").trim().toLowerCase();
     return {
       ...contract,
@@ -2205,7 +2385,7 @@ function renderClauses(options = {}) {
     };
   }
 
-  function normalizeSnapshot(snapshot, fields) {
+  function normalizeSnapshot(snapshot, fields, contractStatus = "draft") {
     if (!snapshot) return null;
     const rawSnapshotFields = snapshot.fields || fields;
     const normalized = {
@@ -2226,7 +2406,8 @@ function renderClauses(options = {}) {
       clauseSeedVersion: snapshot.clauseSeedVersion || "",
     };
     normalizePlatformFields(normalized.fields, rawSnapshotFields);
-    if (shouldUpgradeSnapshotClauses(normalized)) {
+    normalized.fields.amountUpper = moneyToChinese(normalized.fields.price) || normalized.fields.amountUpper || fields.amountUpper;
+    if (contractStatus === "draft" && shouldUpgradeSnapshotClauses(normalized)) {
       normalized.clauses = clone(DEFAULT_CLAUSES);
       normalized.clauseVersion = CLAUSE_SEED_LABEL;
       normalized.clauseSeedVersion = CLAUSE_SEED_VERSION;
@@ -2237,9 +2418,7 @@ function renderClauses(options = {}) {
   function shouldUpgradeSnapshotClauses(snapshot) {
     if (!snapshot) return false;
     if (snapshot.clauseSeedVersion === CLAUSE_SEED_VERSION) return false;
-    const firstClause = getIn(snapshot, ["clauses", 0]);
-    const firstLine = getIn(firstClause, ["body", 0]) || "";
-    return firstClause && firstClause.title === "三、权利义务" && firstLine.includes("甲方应按约定向乙方提供合作需求");
+    return false;
   }
 
   function normalizeOptions(values, defaults = [], extras = []) {
