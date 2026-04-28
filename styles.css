@@ -421,6 +421,12 @@ textarea:disabled {
   resize: vertical;
 }
 
+.field-hint {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .embedded-field input[type="file"] {
   height: auto;
   padding: 6px;
@@ -1152,6 +1158,33 @@ textarea:disabled {
   color: #344252;
   font-size: 13px;
   line-height: 1.65;
+}
+
+.clause-preview-item {
+  background: #f8fbff;
+  border-color: #d7e6fb;
+}
+
+.clause-preview-head {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.clause-preview-head p {
+  margin: 0;
+  color: #5b6b7e;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.clause-token-highlight {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: rgba(37, 99, 235, 0.12);
+  color: #1d4ed8;
+  font-weight: 600;
 }
 
 .clause-textarea {

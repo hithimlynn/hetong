@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260428-dynamic-clause-preview";
+  const BUILD_TAG = "20260428-clause-preview-clarity";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -258,6 +258,44 @@
     deductionScenario: "若乙方未按约定时间交稿 / 发布、内容违规被平台删除、数据造假（如刷赞、刷评论），甲方有权暂缓或拒绝支付尾款，同时要求乙方限期整改。数据不达标但无违规行为的情形，甲方可要求乙方进行二次补发或延长维护服务。",
     partyASignDate: "",
     partyASignature: "",
+  };
+
+  const FIELD_LABEL_OVERRIDES = {
+    draftSubmitDeadlineDate: "初稿提交截止日期",
+    draftSubmitDeadlineTime: "初稿提交截止时间",
+    reviewContact: "甲方指定联系人",
+    reviewFeedbackWorkdays: "甲方审核反馈时限",
+    finalRevisionWorkdays: "终稿修改完成时限",
+    publishTime: "最终内容发布时间",
+    rescheduleNoticeHours: "改期提前通知时限",
+    sampleFeedbackNote: "样品反馈条文说明",
+    maintenanceDays: "发布后维护周期",
+    prepaymentWorkdays: "预付款支付时限",
+    prepaymentPercent: "预付款比例",
+    finalPaymentAfterPublishDays: "尾款数据统计周期",
+    finalPaymentWorkdays: "尾款支付时限",
+    finalPaymentPercent: "尾款比例",
+    performanceMetric: "数据达标标准",
+    deductionScenario: "扣付情形条文说明",
+  };
+
+  const FIELD_PREVIEW_HINTS = {
+    draftSubmitDeadlineDate: "将更新到：三、档期与流程 > 内容初稿提交时间",
+    draftSubmitDeadlineTime: "将更新到：三、档期与流程 > 内容初稿提交时间",
+    reviewContact: "将更新到：三、档期与流程 > 甲方指定联系人",
+    reviewFeedbackWorkdays: "将更新到：三、档期与流程 > 甲方审核反馈时间",
+    finalRevisionWorkdays: "将更新到：三、档期与流程 > 最终内容确认时间",
+    publishTime: "将更新到：三、档期与流程 > 最终内容确认时间",
+    rescheduleNoticeHours: "将更新到：三、档期与流程 > 调整限制",
+    sampleFeedbackNote: "将更新到：三、档期与流程 > 样品反馈说明",
+    maintenanceDays: "将更新到：四、推广费用与支付 > 发布后维护说明",
+    prepaymentWorkdays: "将更新到：四、推广费用与支付 > 预付款条款",
+    prepaymentPercent: "将更新到：四、推广费用与支付 > 预付款条款",
+    finalPaymentAfterPublishDays: "将更新到：四、推广费用与支付 > 尾款条款",
+    finalPaymentWorkdays: "将更新到：四、推广费用与支付 > 尾款条款",
+    finalPaymentPercent: "将更新到：四、推广费用与支付 > 尾款条款",
+    performanceMetric: "将更新到：四、推广费用与支付 > 数据达标标准",
+    deductionScenario: "将更新到：四、推广费用与支付 > 扣付情形",
   };
 
   const supabaseConfig = normalizeSupabaseConfig(window.__HETONG_SUPABASE__ || {});
@@ -1313,7 +1351,10 @@ function renderClauses(options = {}) {
               ${editable("rescheduleNoticeHours")}
             </div>
             ${editable("sampleFeedbackNote")}
-            ${renderClausePreviewCard(dynamicClauses[0], fields)}
+            ${renderClausePreviewCard(dynamicClauses[0], fields, {
+              title: "三、档期与流程（预览）",
+              lead: "上方时间、联系人和反馈时限会同步更新到这一段。",
+            })}
           </section>
           <section class="editable-block">
             <h3>四、推广费用与支付设置</h3>
@@ -1327,7 +1368,10 @@ function renderClauses(options = {}) {
             </div>
             ${editable("performanceMetric")}
             ${editable("deductionScenario")}
-            ${renderClausePreviewCard(dynamicClauses[1], fields)}
+            ${renderClausePreviewCard(dynamicClauses[1], fields, {
+              title: "四、推广费用与支付（预览）",
+              lead: "上方金额、比例、统计周期和达标标准会同步更新到这一段。",
+            })}
           </section>
           ${tailClauses.map((clause) => renderClauseSection(clause, fields)).join("")}
           <section class="editable-block signature-edit-block">
@@ -1349,13 +1393,19 @@ function renderClauses(options = {}) {
       partyASignaturePad: { key: "partyASignature", label: "手写签名", type: "signature" },
     };
     if (aliases[key]) return aliases[key];
-    return FIELD_GROUPS.flatMap((group) => group.fields).find((field) => field.key === key) || { key, label: key };
+    const baseField = FIELD_GROUPS.flatMap((group) => group.fields).find((field) => field.key === key) || { key, label: key };
+    return {
+      ...baseField,
+      label: FIELD_LABEL_OVERRIDES[key] || baseField.label,
+      previewHint: FIELD_PREVIEW_HINTS[key] || baseField.previewHint || "",
+    };
   }
 
   function renderInlineField(contract, field, locked) {
     return `<div class="embedded-field${field.wide || field.type === "textarea" || field.type === "signature" ? " is-wide" : ""}">
       <span class="embedded-label">${field.label}${field.required ? '<i class="required">*</i>' : ""}</span>
       ${renderFieldControl(contract, field, locked)}
+      ${field.previewHint ? `<span class="field-hint">${escapeHtml(field.previewHint)}</span>` : ""}
     </div>`;
   }
 
@@ -1412,14 +1462,42 @@ function renderClauses(options = {}) {
     `;
   }
 
-  function renderClausePreviewCard(clause, fields = {}) {
+  function renderClausePreviewCard(clause, fields = {}, options = {}) {
     if (!clause) return "";
+    const resolvedTitle = resolveClauseTemplateText(clause.title, fields);
+    const previewTitle = options.title || `${resolvedTitle}（预览）`;
+    const previewLead = options.lead || "高亮内容会随上方字段实时变化。";
     return `
       <article class="clause-item clause-preview-item">
-        <h3>${escapeHtml(resolveClauseTemplateText(clause.title, fields))}</h3>
-        ${clause.body.map((line) => `<p>${escapeHtml(resolveClauseTemplateText(line, fields))}</p>`).join("")}
+        <div class="clause-preview-head">
+          <h3>${escapeHtml(previewTitle)}</h3>
+          <p>${escapeHtml(previewLead)}</p>
+        </div>
+        ${clause.body.map((line) => `<p>${renderClausePreviewLine(line, fields)}</p>`).join("")}
       </article>
     `;
+  }
+
+  function renderClausePreviewLine(line, fields = {}) {
+    const source = String(line || "");
+    const pattern = /\{\{([a-zA-Z0-9_]+)\}\}/g;
+    if (!pattern.test(source)) return escapeHtml(resolveClauseTemplateText(source, fields));
+    pattern.lastIndex = 0;
+    let html = "";
+    let cursor = 0;
+    let match;
+    while ((match = pattern.exec(source))) {
+      html += escapeHtml(source.slice(cursor, match.index));
+      html += renderClausePreviewValue(match[1], fields);
+      cursor = match.index + match[0].length;
+    }
+    html += escapeHtml(source.slice(cursor));
+    return html;
+  }
+
+  function renderClausePreviewValue(token, fields = {}) {
+    const value = clauseTemplateValue(token, fields) || "未填写";
+    return `<span class="clause-token-highlight">${escapeHtml(value)}</span>`;
   }
 
   function resolveClauseTemplateText(text, fields = {}) {
