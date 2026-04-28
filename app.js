@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260428-sidebar-filter-buttons";
+  const BUILD_TAG = "20260428-sidebar-filter-ui-refresh";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -491,6 +491,47 @@
   function renderForm(options = {}) {
     const contract = currentContract();
     renderContractPreviewContent(contract, options);
+  }
+
+  function renderSidebarFilterManager(filterKey, label, values) {
+    const currentValue = String(contractListFilters[filterKey] || "").trim();
+    const isOpen = openSidebarFilterPanelKey === filterKey;
+    const options = ["", ...normalizeOptions(values, [])];
+    const displayValue = currentValue || "全部";
+    return `
+      <div class="option-manager sidebar-filter-manager${isOpen ? " is-open" : ""}" data-sidebar-filter-manager="${filterKey}">
+        <button
+          class="option-trigger sidebar-filter-button${currentValue ? " has-value" : ""}"
+          type="button"
+          data-sidebar-filter-toggle="${filterKey}"
+          aria-expanded="${isOpen ? "true" : "false"}"
+        >
+          <span class="sidebar-filter-button-main">
+            <span class="sidebar-filter-label">${escapeHtml(label)}</span>
+            <span class="sidebar-filter-current">${escapeHtml(displayValue)}</span>
+          </span>
+          <span class="sidebar-filter-caret" aria-hidden="true">${isOpen ? "▴" : "▾"}</span>
+        </button>
+        <div class="option-panel sidebar-filter-panel"${isOpen ? "" : " hidden"}>
+          <div class="option-list">
+            ${options.map((option) => {
+              const valueLabel = option || "全部";
+              const selected = option === currentValue;
+              return `
+                <div class="option-item sidebar-filter-item">
+                  <button
+                    class="option-select${selected ? " is-selected" : ""}"
+                    type="button"
+                    data-sidebar-filter-select="${filterKey}"
+                    data-sidebar-filter-value="${escapeAttr(option)}"
+                  >${escapeHtml(valueLabel)}</button>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   function renderField(contract, field, locked) {
