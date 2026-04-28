@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260428-clause-editor-session-lock";
+  const BUILD_TAG = "20260428-sidebar-filter-buttons";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -209,6 +209,11 @@
   let signerUploadName = "";
   let signerUploadKey = "";
   let openOptionPanelKey = "";
+  let openSidebarFilterPanelKey = "";
+  const contractListFilters = {
+    brand: "",
+    platform: "",
+  };
   let canvasReady = false;
   let resizeSignatureCanvas = () => {};
   const partyASignatureDraftByContractId = new Map();
@@ -362,6 +367,8 @@
     contractForm.addEventListener("focusout", handleContractFormFocusOut);
     document.getElementById("contractList").addEventListener("click", selectContractFromList);
     document.getElementById("searchInput").addEventListener("input", renderContractList);
+    document.getElementById("sidebarFilters").addEventListener("click", handleSidebarFilterClick);
+    document.addEventListener("click", handleDocumentClick);
     document.getElementById("authForm").addEventListener("submit", handleAuthSubmit);
   }
 
@@ -392,6 +399,7 @@
 
   function renderContractList() {
     const query = document.getElementById("searchInput").value.trim().toLowerCase();
+    renderSidebarFilters();
     const list = document.getElementById("contractList");
     const items = store.contracts.filter((contract) => {
       const text = [
@@ -404,7 +412,10 @@
       ]
         .join(" ")
         .toLowerCase();
-      return !query || text.includes(query);
+      if (query && !text.includes(query)) return false;
+      if (contractListFilters.brand && String(contract.fields.brand || "") !== contractListFilters.brand) return false;
+      if (contractListFilters.platform && String(contract.fields.platform || "") !== contractListFilters.platform) return false;
+      return true;
     });
     document.getElementById("contractCount").textContent = String(store.contracts.length);
     list.innerHTML = items
@@ -434,6 +445,47 @@
     document.getElementById("monthCount").textContent = String(monthContracts.length);
     document.getElementById("monthAmount").textContent = formatMoney(amount);
     document.getElementById("signedCount").textContent = String(monthContracts.filter((contract) => contract.status === "signed").length);
+  }
+
+  function renderSidebarFilters() {
+    const root = document.getElementById("sidebarFilters");
+    if (!root) return;
+    root.innerHTML = [
+      renderSidebarFilterManager("brand", "品牌", store.brandOptions || []),
+      renderSidebarFilterManager("platform", "平台", store.platformOptions || []),
+    ].join("");
+  }
+
+  function renderSidebarFilterManager(filterKey, label, values) {
+    const currentValue = String(contractListFilters[filterKey] || "").trim();
+    const isOpen = openSidebarFilterPanelKey === filterKey;
+    const options = ["", ...normalizeOptions(values, [])];
+    return `
+      <div class="option-manager sidebar-filter-manager${isOpen ? " is-open" : ""}" data-sidebar-filter-manager="${filterKey}">
+        <button class="option-trigger" type="button" data-sidebar-filter-toggle="${filterKey}">
+          <span class="option-trigger-value">${escapeHtml(`${label}：${currentValue || "全部"}`)}</span>
+          <span class="option-trigger-action">${isOpen ? "收起" : "筛选"}</span>
+        </button>
+        <div class="option-panel"${isOpen ? "" : " hidden"}>
+          <div class="option-list">
+            ${options.map((option) => {
+              const valueLabel = option || "全部";
+              const selected = option === currentValue;
+              return `
+                <div class="option-item sidebar-filter-item">
+                  <button
+                    class="option-select${selected ? " is-selected" : ""}"
+                    type="button"
+                    data-sidebar-filter-select="${filterKey}"
+                    data-sidebar-filter-value="${escapeAttr(option)}"
+                  >${escapeHtml(valueLabel)}</button>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   function renderForm(options = {}) {
@@ -583,6 +635,26 @@
     if (!getClosest(event.target, "[data-option-manager]")) openOptionPanelKey = "";
   }
 
+  function handleSidebarFilterClick(event) {
+    const toggle = getClosest(event.target, "[data-sidebar-filter-toggle]");
+    if (toggle) {
+      toggleSidebarFilterPanel(toggle.dataset.sidebarFilterToggle);
+      return;
+    }
+    const select = getClosest(event.target, "[data-sidebar-filter-select]");
+    if (select) {
+      selectSidebarFilterValue(select.dataset.sidebarFilterSelect, select.dataset.sidebarFilterValue || "");
+      return;
+    }
+  }
+
+  function handleDocumentClick(event) {
+    if (openSidebarFilterPanelKey && !getClosest(event.target, "[data-sidebar-filter-manager]")) {
+      openSidebarFilterPanelKey = "";
+      renderSidebarFilters();
+    }
+  }
+
   function handleFormKeydown(event) {
     beginAdminEditingSession(event.target, event.target && event.target.type === "date" ? 12000 : 6000);
     const optionInput = getClosest(event.target, "[data-option-new]");
@@ -596,6 +668,18 @@
     if (!contract || contract.status !== "draft") return;
     openOptionPanelKey = openOptionPanelKey === fieldKey ? "" : fieldKey;
     renderForm({ force: true, ignoreDefer: true });
+  }
+
+  function toggleSidebarFilterPanel(filterKey) {
+    openSidebarFilterPanelKey = openSidebarFilterPanelKey === filterKey ? "" : filterKey;
+    renderSidebarFilters();
+  }
+
+  function selectSidebarFilterValue(filterKey, value) {
+    if (filterKey !== "brand" && filterKey !== "platform") return;
+    contractListFilters[filterKey] = String(value || "").trim();
+    openSidebarFilterPanelKey = "";
+    renderContractList();
   }
 
   function addComboOption(fieldKey) {

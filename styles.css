@@ -261,6 +261,27 @@ textarea:disabled {
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
+.sidebar-filter-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+  margin-bottom: 14px;
+}
+
+.sidebar-filter-row .option-trigger {
+  min-height: 34px;
+  background: #fff;
+}
+
+.sidebar-filter-row .option-panel {
+  background: #fff;
+}
+
+.sidebar-filter-item {
+  grid-template-columns: 1fr;
+}
+
 .editable-contract .contract-page {
   font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", Arial, sans-serif;
   font-size: 12px;
@@ -1178,6 +1199,10 @@ body.exporting-pdf .contract-page {
 
   .main-area {
     padding: 10px;
+  }
+
+  .sidebar-filter-row {
+    grid-template-columns: 1fr;
   }
 
   .clause-template-library-head,
