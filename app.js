@@ -1436,6 +1436,9 @@ function renderClauses(options = {}) {
           </label>
         </article>
       `).join("")}
+      <div class="clause-actions">
+        <button class="ghost-button clause-add-button" type="button" data-clause-add="tail">新增条款</button>
+      </div>
     `;
     lastClauseEditorIdentity = nextIdentity;
     pendingClauseViewRefresh = false;
@@ -1449,6 +1452,11 @@ function renderClauses(options = {}) {
   }
 
   function handleClauseTemplateClick(event) {
+    const addClauseButton = getClosest(event.target, "[data-clause-add]");
+    if (addClauseButton) {
+      addClauseTemplateSection();
+      return;
+    }
     const button = getClosest(event.target, "[data-clause-template-id]");
     if (!button) return;
     const versionId = String(button.dataset.clauseTemplateId || "").trim();
@@ -1461,6 +1469,29 @@ function renderClauses(options = {}) {
     renderTopState();
     const next = activeClauseVersion();
     document.getElementById("syncState").textContent = `已切换默认模板 ${next.version}`;
+  }
+
+  function addClauseTemplateSection() {
+    const version = activeClauseVersion();
+    if (!version) return;
+    const draft = collectClauseEditorDraft(version);
+    const tailSections = normalizeTailClauseSections(draft.sections, DEFAULT_CLAUSES.slice(2));
+    const nextIndex = tailSections.length;
+    tailSections.push(makeDefaultTailClauseSection(nextIndex));
+    const nextDraft = {
+      versionName: draft.versionName,
+      sections: [...clone(DEFAULT_CLAUSES.slice(0, 2)), ...tailSections],
+    };
+    clauseEditorDraftByVersionId.set(version.id, nextDraft);
+    clearClauseEditingSession({ force: true, clearPending: true });
+    renderClauseEditorContent(version, { force: true, ignoreDefer: true });
+    window.requestAnimationFrame(() => {
+      const target = document.querySelector(`.clause-item[data-clause-editable="true"]:nth-of-type(${nextIndex + 1}) [data-clause-field="title"]`);
+      if (!target) return;
+      target.focus();
+      if (typeof target.select === "function") target.select();
+    });
+    document.getElementById("syncState").textContent = `已新增${buildDefaultTailClauseTitle(nextIndex)}`;
   }
 
   function saveClauseVersion() {
@@ -3281,11 +3312,35 @@ function renderClauses(options = {}) {
     const filtered = incoming.filter((clause) => !isDynamicClauseTitle(clause && clause.title));
     const source = filtered.length ? filtered : fallbackSections;
     return source.map((clause, index) => ({
-      title: getIn(fallbackSections, [index, "title"]) || clause.title || `条款 ${index + 1}`,
+      title: getIn(fallbackSections, [index, "title"]) || clause.title || buildDefaultTailClauseTitle(index),
       body: Array.isArray(clause.body) && clause.body.length
         ? clone(clause.body)
-        : clone(getIn(fallbackSections, [index, "body"]) || [""]),
+        : clone(getIn(fallbackSections, [index, "body"]) || makeDefaultTailClauseSection(index).body),
     }));
+  }
+
+  function makeDefaultTailClauseSection(index) {
+    return {
+      title: buildDefaultTailClauseTitle(index),
+      body: ["请填写条款内容。"],
+    };
+  }
+
+  function buildDefaultTailClauseTitle(index) {
+    const clauseNumber = index + 5;
+    return `${toChineseClauseNumeral(clauseNumber)}、补充条款`;
+  }
+
+  function toChineseClauseNumeral(value) {
+    const numerals = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
+    const number = Number(value);
+    if (!Number.isFinite(number) || number <= 0) return "条款";
+    if (number < 10) return numerals[number];
+    if (number === 10) return "十";
+    if (number < 20) return `十${numerals[number % 10]}`;
+    if (number % 10 === 0) return `${numerals[Math.floor(number / 10)]}十`;
+    if (number < 100) return `${numerals[Math.floor(number / 10)]}十${numerals[number % 10]}`;
+    return String(number);
   }
 
   function isDynamicClauseTitle(title) {
@@ -3363,13 +3418,13 @@ function renderClauses(options = {}) {
       ? blocks.map((block, index) => {
         const titleInput = block.querySelector('[data-clause-field="title"]');
         const bodyInput = block.querySelector('[data-clause-field="body"]');
-        const title = (titleInput ? titleInput.value.trim() : "") || getIn(DEFAULT_CLAUSES, [index + 2, "title"]) || `条款 ${index + 1}`;
+        const title = (titleInput ? titleInput.value.trim() : "") || getIn(DEFAULT_CLAUSES, [index + 2, "title"]) || buildDefaultTailClauseTitle(index);
         const bodyText = bodyInput ? bodyInput.value : "";
         const body = bodyText
           .split(/\n+/)
           .map((line) => line.trim())
           .filter(Boolean);
-        return { title, body: body.length ? body : ["请填写条款内容。"] };
+        return { title, body: body.length ? body : makeDefaultTailClauseSection(index).body };
       })
       : normalizeTailClauseSections(getIn(version, ["sections"]) || DEFAULT_CLAUSES, DEFAULT_CLAUSES.slice(2));
     return { versionName, sections: [...clone(DEFAULT_CLAUSES.slice(0, 2)), ...tailSections] };

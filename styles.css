@@ -1123,6 +1123,15 @@ textarea:disabled {
   gap: 16px;
 }
 
+.clause-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.clause-add-button {
+  min-width: 104px;
+}
+
 .clause-template-panel {
   display: grid;
   gap: 14px;
