@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260428-inline-dynamic-clauses";
+  const BUILD_TAG = "20260428-clause-label-fix";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -1268,11 +1268,11 @@ function renderClauses(options = {}) {
       ${tailSections.map((clause, index) => `
         <article class="clause-item" data-clause-editable="true">
           <label class="field is-wide">
-            <span>鏉℃鏍囬</span>
+            <span>条款标题</span>
             <input data-clause-index="${index}" data-clause-field="title" type="text" value="${escapeAttr(clause.title)}" />
           </label>
           <label class="field is-wide">
-            <span>鏉℃鍐呭</span>
+            <span>条款内容</span>
             <textarea class="clause-textarea" data-clause-index="${index}" data-clause-field="body">${escapeHtml(clause.body.join("\n"))}</textarea>
           </label>
         </article>
