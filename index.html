@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>合同生成系统</title>
-    <link rel="stylesheet" href="./styles.css?v=20260428-promotion-fee-split" />
+    <link rel="stylesheet" href="./styles.css?v=20260428-mobile-admin-flow" />
   </head>
   <body class="auth-locked">
     <section class="auth-screen" aria-label="甲方登录">
@@ -39,7 +39,15 @@
       </header>
 
       <main class="workspace">
-        <aside class="sidebar">
+        <button id="mobileLibraryToggle" class="mobile-library-toggle" type="button" aria-expanded="false" aria-controls="mobileLibraryPanel">
+          <span>
+            <strong>合同库</strong>
+            <b id="mobileContractCount">0</b>
+          </span>
+          <small id="mobileContractSummary">当前合同</small>
+          <em id="mobileLibraryToggleText">展开</em>
+        </button>
+        <aside id="mobileLibraryPanel" class="sidebar">
           <div class="sidebar-head">
             <h2>合同库</h2>
             <span id="contractCount">0</span>
@@ -151,11 +159,17 @@
           </section>
         </section>
       </main>
+      <div id="mobileActionBar" class="mobile-action-bar" aria-label="移动端合同操作">
+        <button class="ghost-button" type="button" data-mobile-action="new">新建</button>
+        <button class="ghost-button" type="button" data-mobile-action="save">保存</button>
+        <button class="primary-button" type="button" data-mobile-action="publish">发布</button>
+        <button class="ghost-button" type="button" data-mobile-action="print">导出</button>
+      </div>
     </div>
 
     <div id="printRoot" aria-hidden="true"></div>
     <script src="./config.js?v=20260427-clause-template-library"></script>
     <script src="./vendor/supabase.js?v=20260427-clause-template-library"></script>
-    <script src="./app.js?v=20260428-promotion-fee-split"></script>
+    <script src="./app.js?v=20260428-mobile-admin-flow"></script>
   </body>
 </html>

@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260428-promotion-fee-split";
+  const BUILD_TAG = "20260428-mobile-admin-flow";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -334,6 +334,7 @@
     brand: "",
     platform: "",
   };
+  let isMobileContractLibraryOpen = false;
   let canvasReady = false;
   let resizeSignatureCanvas = () => {};
   const partyASignatureDraftByContractId = new Map();
@@ -440,6 +441,9 @@
     document.querySelectorAll("[data-view]").forEach((button) => {
       button.addEventListener("click", () => {
         activeView = button.dataset.view;
+        if (activeView !== "editor") {
+          isMobileContractLibraryOpen = false;
+        }
         if (activeView !== "signer" && isSignerRoute()) {
           history.replaceState(null, "", location.pathname);
           signerToken = "";
@@ -490,6 +494,14 @@
     document.getElementById("contractList").addEventListener("click", selectContractFromList);
     document.getElementById("searchInput").addEventListener("input", renderContractList);
     document.getElementById("sidebarFilters").addEventListener("click", handleSidebarFilterClick);
+    const mobileLibraryToggle = document.getElementById("mobileLibraryToggle");
+    if (mobileLibraryToggle) {
+      mobileLibraryToggle.addEventListener("click", toggleMobileContractLibrary);
+    }
+    const mobileActionBar = document.getElementById("mobileActionBar");
+    if (mobileActionBar) {
+      mobileActionBar.addEventListener("click", handleMobileActionClick);
+    }
     document.addEventListener("click", handleDocumentClick);
     document.getElementById("authForm").addEventListener("submit", handleAuthSubmit);
   }
@@ -540,6 +552,7 @@
       return true;
     });
     document.getElementById("contractCount").textContent = String(store.contracts.length);
+    renderMobileLibraryState(items.length);
     list.innerHTML = items
       .map((contract) => {
         const status = STATUS[contract.status] || STATUS.draft;
@@ -567,6 +580,72 @@
     document.getElementById("monthCount").textContent = String(monthContracts.length);
     document.getElementById("monthAmount").textContent = formatMoney(amount);
     document.getElementById("signedCount").textContent = String(monthContracts.filter((contract) => contract.status === "signed").length);
+  }
+
+  function renderMobileLibraryState(visibleCount) {
+    const toggle = document.getElementById("mobileLibraryToggle");
+    const panel = document.getElementById("mobileLibraryPanel");
+    if (!toggle || !panel) return;
+    const count = typeof visibleCount === "number" ? visibleCount : store.contracts.length;
+    const contract = currentContract();
+    const status = contract ? (STATUS[contract.status] || STATUS.draft) : null;
+    const summary = contract
+      ? `${contract.fields.brand || "未命名合同"} · ${status ? status.label : "草稿"}`
+      : "未选择合同";
+    const countEl = document.getElementById("mobileContractCount");
+    const summaryEl = document.getElementById("mobileContractSummary");
+    const actionEl = document.getElementById("mobileLibraryToggleText");
+    if (countEl) countEl.textContent = String(count);
+    if (summaryEl) summaryEl.textContent = summary;
+    if (actionEl) actionEl.textContent = isMobileContractLibraryOpen ? "收起" : "展开";
+    toggle.setAttribute("aria-expanded", isMobileContractLibraryOpen ? "true" : "false");
+    panel.classList.toggle("is-mobile-open", isMobileContractLibraryOpen);
+  }
+
+  function toggleMobileContractLibrary() {
+    isMobileContractLibraryOpen = !isMobileContractLibraryOpen;
+    renderMobileLibraryState();
+  }
+
+  function renderMobileActions(contract = currentContract()) {
+    const bar = document.getElementById("mobileActionBar");
+    if (!bar) return;
+    const buttons = Array.from(bar.querySelectorAll("[data-mobile-action]"));
+    buttons.forEach((button) => {
+      const action = button.dataset.mobileAction;
+      if (action === "new") {
+        button.disabled = false;
+      } else if (action === "save") {
+        button.disabled = !contract || contract.status !== "draft";
+      } else if (action === "publish") {
+        button.disabled = !contract || contract.status !== "draft";
+      } else if (action === "print") {
+        button.disabled = !contract;
+      }
+    });
+  }
+
+  function handleMobileActionClick(event) {
+    const button = getClosest(event.target, "[data-mobile-action]");
+    if (!button || button.disabled) return;
+    const action = button.dataset.mobileAction;
+    if (action === "new") {
+      createContract();
+    } else if (action === "save") {
+      saveCurrentDraft();
+    } else if (action === "publish") {
+      publishContract();
+    } else if (action === "print") {
+      printCurrentContract();
+    }
+  }
+
+  function scrollAdminEditorIntoViewOnMobile() {
+    if (!window.matchMedia || !window.matchMedia("(max-width: 720px)").matches) return;
+    window.requestAnimationFrame(() => {
+      const target = document.querySelector(".main-area");
+      if (target) target.scrollIntoView({ block: "start" });
+    });
   }
 
   function renderSidebarFilters() {
@@ -930,7 +1009,10 @@
 
   function renderPreview() {
     const contract = currentContract();
-    if (!contract) return;
+    if (!contract) {
+      renderMobileActions(null);
+      return;
+    }
     const status = STATUS[contract.status] || STATUS.draft;
     document.getElementById("previewMeta").textContent = `${status.label} · ${contract.fields.brand || "未命名合同"}`;
     document.getElementById("publishBtn").disabled = contract.status !== "draft";
@@ -943,6 +1025,7 @@
     } else {
       shareBox.hidden = true;
     }
+    renderMobileActions(contract);
   }
 
   function renderContractPreviewContent(contract, options = {}) {
@@ -1808,9 +1891,11 @@ function renderClauses(options = {}) {
     store.contracts.unshift(contract);
     store.selectedId = contract.id;
     activeView = "editor";
+    isMobileContractLibraryOpen = false;
     document.getElementById("searchInput").value = "";
     saveStore(true, { reason: "create-contract", immediate: true });
     renderAll();
+    scrollAdminEditorIntoViewOnMobile();
   }
 
   function saveCurrentDraft() {
@@ -1982,6 +2067,7 @@ function renderClauses(options = {}) {
     pendingInlineClauseFocusToken = "";
     store.selectedId = item.dataset.contractId;
     activeView = "editor";
+    isMobileContractLibraryOpen = false;
     signerToken = "";
     signerWorkspaceId = "";
     signerWriteToken = "";
@@ -1993,6 +2079,7 @@ function renderClauses(options = {}) {
     }
     saveStore(false, { skipRemote: true });
     renderAll();
+    scrollAdminEditorIntoViewOnMobile();
   }
 
   function deleteContract(contractId) {
