@@ -1065,6 +1065,31 @@ textarea:disabled {
   line-height: 1.45;
 }
 
+.signer-loading-card {
+  min-height: 240px;
+  display: grid;
+  place-content: center;
+  gap: 10px;
+  padding: 28px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent),
+    #eef3f8;
+  color: var(--muted);
+  text-align: center;
+}
+
+.signer-loading-card strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.signer-loading-card p {
+  margin: 0;
+  line-height: 1.5;
+}
+
 .clause-list {
   display: grid;
   gap: 16px;

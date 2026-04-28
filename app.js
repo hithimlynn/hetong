@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260428-mobile-admin-flow";
+  const BUILD_TAG = "20260428-signer-speed-trust";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -17,6 +17,10 @@
   const SIGNER_LOAD_TIMEOUT_MS = 15000;
   const SIGNER_LOAD_RETRY_DELAY_MS = 1000;
   const SIGNER_LOAD_CACHE_MS = 10000;
+  const SIGNER_SESSION_CACHE_PREFIX = "signer-contract-cache-v1:";
+  const SIGNER_SUBMIT_SLOW_NOTICE_MS = 3000;
+  const SIGNATURE_IMAGE_WIDTH = 520;
+  const SIGNATURE_IMAGE_QUALITY = 0.72;
   const REMOTE_SAVE_RETRY_LIMIT = 3;
   const CONTRACT_TITLE = "达人内容发布合作协议";
   const CLAUSE_SEED_VERSION = "wlead-template-2026-04-28-flow-payment";
@@ -320,6 +324,7 @@
   let signerLinkWarning = "";
   let signerRemoteLoading = false;
   let signerSubmitInProgress = false;
+  let signerSubmitSlowTimer = 0;
   let signerLoadPromise = null;
   let signerLoadKey = "";
   let signerLastLoadedKey = "";
@@ -1267,12 +1272,18 @@
     const signerNameInput = document.getElementById("signerName");
     const confirmCheckbox = document.getElementById("confirmCheckbox");
     const signerUpload = document.getElementById("signerUpload");
+    const submitButton = document.getElementById("submitSignBtn");
     const canSign = contract && ["published", "confirmed"].includes(contract.status) && !signerSubmitInProgress;
     if (!contract) {
       status.textContent = signerRemoteLoading
         ? "正在加载线上合同..."
         : signerLinkWarning || "暂无可签署合同。请先由甲方发布合同，或打开乙方签署链接。";
-      preview.innerHTML = `<div class="status-note">${escapeHtml(status.textContent)}</div>`;
+      preview.innerHTML = `
+        <div class="signer-loading-card">
+          <strong>${escapeHtml(CONTRACT_TITLE)}</strong>
+          <p>${escapeHtml(status.textContent)}</p>
+        </div>
+      `;
       meta.textContent = `${CONTRACT_TITLE} · 待发布`;
       signerNameInput.value = "";
     } else {
@@ -1298,7 +1309,8 @@
     confirmCheckbox.disabled = !canSign;
     confirmCheckbox.checked = Boolean(contract && ["confirmed", "signed"].includes(contract.status));
     signerUpload.disabled = !canSign;
-    document.getElementById("submitSignBtn").disabled = !canSign;
+    submitButton.disabled = !canSign;
+    submitButton.textContent = signerSubmitInProgress ? "正在安全提交..." : "提交签署";
     document.getElementById("clearSignBtn").disabled = !canSign;
     document.getElementById("signerPrintBtn").disabled = !contract;
     renderSignerUploadState(contract);
@@ -2019,10 +2031,11 @@ function renderClauses(options = {}) {
       try {
         signerSubmitInProgress = true;
         signerRemoteLoading = true;
-        showSignMessage("正在提交签署，请稍候...", "ok");
+        startSignerSubmitSlowNotice();
+        showSignMessage("正在安全提交签署，请勿关闭页面...", "ok");
         renderTopState();
         renderSigner();
-        const remoteContract = await submitRemoteSignature({
+        const remoteContract = await submitRemoteSignatureWithFallback({
           signerName,
           imageData: signatureImage,
           userAgent: navigator.userAgent,
@@ -2030,14 +2043,17 @@ function renderClauses(options = {}) {
         signerPayloadContract = normalizeContract(remoteContract);
         signerPayloadContract.signature = clone(remoteContract.signature || signerPayloadContract.signature);
         mergeRemoteContractIntoLocalStore(signerPayloadContract);
-        await loadSignerContractFromCloud({ force: true });
+        storeSignerContractSessionCache(currentSignerRequestKey(), signerPayloadContract);
         signerRemoteLoading = false;
         signerSubmitInProgress = false;
-        showSignMessage("签署已完成，已直接同步给甲方。", "ok");
+        clearSignerSubmitSlowNotice();
+        showSignMessage(`签署完成，已同步给甲方。签署人：${signerName}，时间：${formatDateTime(signature.signedAt)}`, "ok");
+        confirmSignerCloudSyncInBackground();
         renderAll();
       } catch (error) {
         signerRemoteLoading = false;
         signerSubmitInProgress = false;
+        clearSignerSubmitSlowNotice();
         showSignMessage(friendlyCloudError(error, "线上签署提交失败，请稍后重试。"));
         renderAll();
       }
@@ -2232,7 +2248,13 @@ function renderClauses(options = {}) {
       renderSignerUploadState(contract);
       return;
     }
-    readImageFileAsDataUrl(file, { maxWidth: 720, maxHeight: 260, type: "image/png" })
+    readImageFileAsDataUrl(file, {
+      maxWidth: SIGNATURE_IMAGE_WIDTH,
+      maxHeight: 220,
+      type: "image/jpeg",
+      quality: SIGNATURE_IMAGE_QUALITY,
+      fillStyle: "#fff",
+    })
       .then((dataUrl) => {
         signerUploadData = dataUrl;
         signerUploadName = file.name || "";
@@ -2553,13 +2575,13 @@ function renderClauses(options = {}) {
   function compactSignatureDataUrl(sourceCanvas) {
     const target = document.createElement("canvas");
     const sourceRatio = sourceCanvas.width && sourceCanvas.height ? sourceCanvas.width / sourceCanvas.height : 3;
-    target.width = 720;
+    target.width = SIGNATURE_IMAGE_WIDTH;
     target.height = Math.max(180, Math.round(target.width / sourceRatio));
     const context = target.getContext("2d");
     context.fillStyle = "#fff";
     context.fillRect(0, 0, target.width, target.height);
     context.drawImage(sourceCanvas, 0, 0, target.width, target.height);
-    return target.toDataURL("image/jpeg", 0.82);
+    return target.toDataURL("image/jpeg", SIGNATURE_IMAGE_QUALITY);
   }
 
   function compactPartyASignatureDataUrl(sourceCanvas) {
@@ -3808,7 +3830,8 @@ function renderClauses(options = {}) {
     }
     const key = currentSignerRequestKey();
     const now = Date.now();
-    if (!options.force && signerPayloadContract && signerLastLoadedKey === key && now - signerLastLoadedAt < SIGNER_LOAD_CACHE_MS) {
+    const hydratedFromSession = !options.force && hydrateSignerContractFromSessionCache(key);
+    if (!options.force && !hydratedFromSession && signerPayloadContract && signerLastLoadedKey === key && now - signerLastLoadedAt < SIGNER_LOAD_CACHE_MS) {
       return signerPayloadContract;
     }
     if (!options.force && signerLoadPromise && signerLoadKey === key) {
@@ -3816,16 +3839,19 @@ function renderClauses(options = {}) {
     }
     signerLoadKey = key;
     signerRemoteLoading = true;
-    signerLinkWarning = "Loading online contract...";
+    signerLinkWarning = signerPayloadContract ? "正在刷新最新合同..." : "正在连接合同服务...";
     renderAll();
     signerLoadPromise = (async () => {
       try {
+        signerLinkWarning = "正在读取线上合同...";
+        renderAll();
         const remoteContract = await fetchSignerContractWithRetry();
         signerPayloadContract = normalizeContract(remoteContract);
         signerLastLoadedKey = key;
         signerLastLoadedAt = Date.now();
         signerLinkWarning = "";
         mergeRemoteContractIntoLocalStore(signerPayloadContract);
+        storeSignerContractSessionCache(key, signerPayloadContract);
         return signerPayloadContract;
       } catch (error) {
         signerLinkWarning = friendlyCloudError(error, "Online contract failed to load. Please check the network or ask party A to publish again.");
@@ -3843,6 +3869,38 @@ function renderClauses(options = {}) {
 
   function currentSignerRequestKey() {
     return [signerWorkspaceId || "", signerToken || "", signerWriteToken || ""].join("|");
+  }
+
+  function signerSessionCacheKey(key) {
+    return `${SIGNER_SESSION_CACHE_PREFIX}${key}`;
+  }
+
+  function hydrateSignerContractFromSessionCache(key) {
+    try {
+      const raw = sessionStorage.getItem(signerSessionCacheKey(key));
+      if (!raw) return false;
+      const cached = JSON.parse(raw);
+      if (!cached || !cached.contract) return false;
+      signerPayloadContract = normalizeContract(cached.contract);
+      signerLastLoadedKey = key;
+      signerLastLoadedAt = Number(cached.at || 0);
+      signerLinkWarning = "已显示上次加载的合同，正在刷新最新状态...";
+      renderAll();
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function storeSignerContractSessionCache(key, contract) {
+    try {
+      sessionStorage.setItem(signerSessionCacheKey(key), JSON.stringify({
+        at: Date.now(),
+        contract: normalizeContract(contract),
+      }));
+    } catch (error) {
+      // Session cache is an experience optimization only.
+    }
   }
 
   async function fetchSignerContractFromCloud() {
@@ -3877,20 +3935,73 @@ function renderClauses(options = {}) {
     return /timeout|Failed to fetch|ERR_FAILED|ERR_CONNECTION_CLOSED/i.test(message);
   }
 
-  async function submitRemoteSignature(payload) {
-    const response = await callSignerFunction("POST", {
+  async function submitRemoteSignatureWithFallback(payload) {
+    try {
+      return await submitRemoteSignature(payload, { withFallback: false });
+    } catch (error) {
+      if (!isMissingContractSignerError(error)) throw error;
+      showSignMessage("合同服务正在恢复签署数据，请稍候...", "ok");
+      return submitRemoteSignature(payload, { withFallback: true });
+    }
+  }
+
+  async function submitRemoteSignature(payload, options = {}) {
+    const body = {
       ws: signerWorkspaceId,
       ct: signerToken,
       wt: signerWriteToken,
       signerName: payload.signerName,
       imageData: payload.imageData,
       userAgent: payload.userAgent,
-      fallbackContract: buildSignerFallbackContract(signerContract()),
-    });
+    };
+    if (options.withFallback) {
+      body.fallbackContract = buildSignerFallbackContract(signerContract());
+    }
+    const response = await callSignerFunction("POST", body);
     if (!response || !response.contract) {
       throw new Error("签署结果返回不完整。");
     }
     return response.contract;
+  }
+
+  function isMissingContractSignerError(error) {
+    const message = error && error.message ? String(error.message) : "";
+    if (/invalid|expired|permission|not allowed|Forbidden|失效|权限/i.test(message)) return false;
+    return /not found|missing contract|workspace|未找到|找不到|工作区|对应的合同/i.test(message);
+  }
+
+  function startSignerSubmitSlowNotice() {
+    clearSignerSubmitSlowNotice();
+    signerSubmitSlowTimer = window.setTimeout(() => {
+      signerSubmitSlowTimer = 0;
+      if (!signerSubmitInProgress) return;
+      showSignMessage("网络较慢，请勿关闭页面，签名正在安全同步给甲方。", "ok");
+    }, SIGNER_SUBMIT_SLOW_NOTICE_MS);
+  }
+
+  function clearSignerSubmitSlowNotice() {
+    if (!signerSubmitSlowTimer) return;
+    clearTimeout(signerSubmitSlowTimer);
+    signerSubmitSlowTimer = 0;
+  }
+
+  function confirmSignerCloudSyncInBackground() {
+    const requestKey = currentSignerRequestKey();
+    fetchSignerContractFromCloud()
+      .then((remoteContract) => {
+        if (requestKey !== currentSignerRequestKey()) return;
+        signerPayloadContract = normalizeContract(remoteContract);
+        signerLastLoadedKey = requestKey;
+        signerLastLoadedAt = Date.now();
+        signerLinkWarning = "";
+        mergeRemoteContractIntoLocalStore(signerPayloadContract);
+        storeSignerContractSessionCache(requestKey, signerPayloadContract);
+        renderAll();
+      })
+      .catch(() => {
+        if (requestKey !== currentSignerRequestKey()) return;
+        showSignMessage("签署已提交，后台确认较慢；如页面未更新，可刷新后查看。", "ok");
+      });
   }
 
   async function callSignerFunction(method, body) {

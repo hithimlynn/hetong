@@ -11,6 +11,9 @@ const CORS_HEADERS = {
 
 module.exports = async (req, res) => {
   setCorsHeaders(res);
+  const startedAt = Date.now();
+  const requestId = makeRequestId();
+  res.setHeader("X-Signer-Request-Id", requestId);
 
   if (req.method === "OPTIONS") {
     res.status(204).end();
@@ -28,6 +31,7 @@ module.exports = async (req, res) => {
     const controller = new AbortController();
     timeout = setTimeout(() => controller.abort(), 25000);
     const body = req.method === "POST" ? await buildPostBody(req) : undefined;
+    const bodyBytes = body ? Buffer.byteLength(body, "utf8") : 0;
 
     const upstreamResponse = await fetch(upstreamUrl, {
       method: req.method,
@@ -47,30 +51,47 @@ module.exports = async (req, res) => {
     if (!upstreamResponse.ok) {
       const upstreamError = data && data.error ? String(data.error) : summarizeText(text);
       console.error("[sign-contract] upstream failed", {
+        requestId,
         method: req.method,
         status: upstreamResponse.status,
+        durationMs: Date.now() - startedAt,
+        bodyBytes,
         error: upstreamError,
       });
       sendJson(res, upstreamResponse.status, {
         error: normalizeUpstreamError(upstreamError, upstreamResponse.status),
         upstreamStatus: upstreamResponse.status,
         upstreamError,
+        requestId,
       });
       return;
     }
 
+    console.info("[sign-contract] upstream ok", {
+      requestId,
+      method: req.method,
+      status: upstreamResponse.status,
+      durationMs: Date.now() - startedAt,
+      bodyBytes,
+    });
     sendJson(res, upstreamResponse.status, data || {});
   } catch (error) {
     if (timeout) clearTimeout(timeout);
     const aborted = error && error.name === "AbortError";
     const message = aborted ? "Signer gateway timed out." : "Signer gateway request failed.";
     console.error("[sign-contract] gateway failed", {
+      requestId,
       method: req.method,
+      durationMs: Date.now() - startedAt,
       error: error && error.message ? error.message : String(error),
     });
-    sendJson(res, aborted ? 504 : 502, { error: message });
+    sendJson(res, aborted ? 504 : 502, { error: message, requestId });
   }
 };
+
+function makeRequestId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 function buildUpstreamUrl(req) {
   if (req.method !== "GET") return UPSTREAM_URL;
