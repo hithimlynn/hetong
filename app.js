@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260428-flow-payment-fields";
+  const BUILD_TAG = "20260428-dynamic-clause-preview";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -1184,21 +1184,28 @@ function renderClauses(options = {}) {
       return;
     }
     const draft = clauseEditorDraft(version);
+    const contract = currentContract();
+    const fields = renderFields(contract) || getIn(contract, ["fields"]) || DEFAULT_FIELDS;
+    const previewSections = clone(DEFAULT_CLAUSES.slice(0, 2));
+    const tailSections = normalizeTailClauseSections(draft.sections, DEFAULT_CLAUSES.slice(2));
     const nextIdentity = buildClauseEditorIdentity(version, draft);
     if (!force && !pendingClauseViewRefresh && nextIdentity === lastClauseEditorIdentity) return;
     document.getElementById("clauseVersionName").value = draft.versionName;
-    document.getElementById("clauseList").innerHTML = draft.sections.map((clause, index) => `
-      <article class="clause-item">
-        <label class="field is-wide">
-          <span>鏉℃鏍囬</span>
-          <input data-clause-index="${index}" data-clause-field="title" type="text" value="${escapeAttr(clause.title)}" />
-        </label>
-        <label class="field is-wide">
-          <span>鏉℃鍐呭</span>
-          <textarea class="clause-textarea" data-clause-index="${index}" data-clause-field="body">${escapeHtml(clause.body.join("\n"))}</textarea>
-        </label>
-      </article>
-    `).join("");
+    document.getElementById("clauseList").innerHTML = `
+      ${previewSections.map((clause) => renderClausePreviewCard(clause, fields)).join("")}
+      ${tailSections.map((clause, index) => `
+        <article class="clause-item" data-clause-editable="true">
+          <label class="field is-wide">
+            <span>鏉℃鏍囬</span>
+            <input data-clause-index="${index}" data-clause-field="title" type="text" value="${escapeAttr(clause.title)}" />
+          </label>
+          <label class="field is-wide">
+            <span>鏉℃鍐呭</span>
+            <textarea class="clause-textarea" data-clause-index="${index}" data-clause-field="body">${escapeHtml(clause.body.join("\n"))}</textarea>
+          </label>
+        </article>
+      `).join("")}
+    `;
     lastClauseEditorIdentity = nextIdentity;
     pendingClauseViewRefresh = false;
   }
@@ -1261,10 +1268,12 @@ function renderClauses(options = {}) {
     document.getElementById("syncState").textContent = `${syncLabel} · ${status}`;
   }
 
-function renderEditableContractDocument(contract) {
+  function renderEditableContractDocument(contract) {
     if (contract.status !== "draft") return renderContractDocument(contract);
     const fields = contract.fields;
-    const clauses = activeClauseVersion().sections;
+    const clauses = composeEditableContractClauses(contract);
+    const dynamicClauses = clauses.slice(0, 2);
+    const tailClauses = clauses.slice(2);
     const editable = (key) => renderInlineField(contract, fieldConfig(key), false);
     const watermark = formatContractWatermark(fields.brand);
     return `
@@ -1304,6 +1313,7 @@ function renderEditableContractDocument(contract) {
               ${editable("rescheduleNoticeHours")}
             </div>
             ${editable("sampleFeedbackNote")}
+            ${renderClausePreviewCard(dynamicClauses[0], fields)}
           </section>
           <section class="editable-block">
             <h3>四、推广费用与支付设置</h3>
@@ -1317,8 +1327,9 @@ function renderEditableContractDocument(contract) {
             </div>
             ${editable("performanceMetric")}
             ${editable("deductionScenario")}
+            ${renderClausePreviewCard(dynamicClauses[1], fields)}
           </section>
-          ${clauses.map((clause) => renderClauseSection(clause, fields)).join("")}
+          ${tailClauses.map((clause) => renderClauseSection(clause, fields)).join("")}
           <section class="editable-block signature-edit-block">
             <h3>甲方签署</h3>
             <div class="embedded-grid two-col">
@@ -1359,7 +1370,7 @@ function renderEditableContractDocument(contract) {
     `;
   }
 
-function renderContractDocument(contract) {
+  function renderContractDocument(contract) {
     const fields = renderFields(contract) || getIn(contract, ["fields"]) || {};
     const clauses = renderClausesForContract(contract);
     const watermark = formatContractWatermark(fields.brand);
@@ -1398,6 +1409,16 @@ function renderContractDocument(contract) {
         <h3>${escapeHtml(resolveClauseTemplateText(clause.title, fields))}</h3>
         ${clause.body.map((line) => `<p>${escapeHtml(resolveClauseTemplateText(line, fields))}</p>`).join("")}
       </section>
+    `;
+  }
+
+  function renderClausePreviewCard(clause, fields = {}) {
+    if (!clause) return "";
+    return `
+      <article class="clause-item clause-preview-item">
+        <h3>${escapeHtml(resolveClauseTemplateText(clause.title, fields))}</h3>
+        ${clause.body.map((line) => `<p>${escapeHtml(resolveClauseTemplateText(line, fields))}</p>`).join("")}
+      </article>
     `;
   }
 
@@ -1625,7 +1646,7 @@ function renderContractDocument(contract) {
     contract.signWriteToken = contract.signWriteToken || randomToken(24);
     contract.snapshot = {
       fields: clone(contract.fields),
-      clauses: clone(activeClauseVersion().sections),
+      clauses: clone(composeEditableContractClauses(contract)),
       clauseVersion: activeClauseVersion().version,
       clauseSeedVersion: activeClauseVersion().seedVersion || "",
       publishedAt: contract.publishedAt,
@@ -2857,7 +2878,37 @@ function renderContractDocument(contract) {
 
   function renderClausesForContract(contract) {
     if (contract.snapshot && contract.status !== "draft") return contract.snapshot.clauses;
-    return activeClauseVersion().sections;
+    return composeEditableContractClauses(contract);
+  }
+
+  function composeEditableContractClauses(contract) {
+    const fields = renderFields(contract) || getIn(contract, ["fields"]) || {};
+    const version = activeClauseVersion();
+    const baseSections = version && Array.isArray(version.sections) ? version.sections : DEFAULT_CLAUSES;
+    return [
+      ...clone(DEFAULT_CLAUSES.slice(0, 2)),
+      ...normalizeTailClauseSections(baseSections, DEFAULT_CLAUSES.slice(2)),
+    ].map((clause) => ({
+      title: resolveClauseTemplateText(clause.title, fields),
+      body: (Array.isArray(clause.body) ? clause.body : []).map((line) => resolveClauseTemplateText(line, fields)),
+    }));
+  }
+
+  function normalizeTailClauseSections(sections, fallbackSections = []) {
+    const incoming = Array.isArray(sections) ? sections : [];
+    const filtered = incoming.filter((clause) => !isDynamicClauseTitle(clause && clause.title));
+    const source = filtered.length ? filtered : fallbackSections;
+    return source.map((clause, index) => ({
+      title: getIn(fallbackSections, [index, "title"]) || clause.title || `条款 ${index + 1}`,
+      body: Array.isArray(clause.body) && clause.body.length
+        ? clone(clause.body)
+        : clone(getIn(fallbackSections, [index, "body"]) || [""]),
+    }));
+  }
+
+  function isDynamicClauseTitle(title) {
+    const text = String(title || "").trim();
+    return text === "三、档期与流程" || text === "四、推广费用与支付";
   }
 
   function activeClauseVersion() {
@@ -2925,12 +2976,12 @@ function renderContractDocument(contract) {
   function collectClauseEditorDraft(version) {
     const versionNameInput = document.getElementById("clauseVersionName");
     const versionName = String(versionNameInput ? versionNameInput.value : "").trim() || (version && version.version) || "";
-    const blocks = Array.from(document.querySelectorAll(".clause-item"));
-    const sections = blocks.length
+    const blocks = Array.from(document.querySelectorAll('.clause-item[data-clause-editable="true"]'));
+    const tailSections = blocks.length
       ? blocks.map((block, index) => {
         const titleInput = block.querySelector('[data-clause-field="title"]');
         const bodyInput = block.querySelector('[data-clause-field="body"]');
-        const title = (titleInput ? titleInput.value.trim() : "") || `条款 ${index + 1}`;
+        const title = (titleInput ? titleInput.value.trim() : "") || getIn(DEFAULT_CLAUSES, [index + 2, "title"]) || `条款 ${index + 1}`;
         const bodyText = bodyInput ? bodyInput.value : "";
         const body = bodyText
           .split(/\n+/)
@@ -2938,8 +2989,8 @@ function renderContractDocument(contract) {
           .filter(Boolean);
         return { title, body: body.length ? body : ["请填写条款内容。"] };
       })
-      : clone((version && version.sections) || DEFAULT_CLAUSES);
-    return { versionName, sections };
+      : normalizeTailClauseSections(getIn(version, ["sections"]) || DEFAULT_CLAUSES, DEFAULT_CLAUSES.slice(2));
+    return { versionName, sections: [...clone(DEFAULT_CLAUSES.slice(0, 2)), ...tailSections] };
   }
 
   function captureClauseEditorDraftFromDom() {
