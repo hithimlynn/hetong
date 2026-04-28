@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260427-preview-restore";
+  const BUILD_TAG = "20260428-option-pool-fix";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -214,6 +214,15 @@
   const partyASignatureDraftByContractId = new Map();
   let partyASignatureDrawingContractId = "";
   let partyASignatureCanvasContractId = "";
+  let adminPreviewFreezeUntil = 0;
+  let adminPreviewRefreshTimer = 0;
+  let adminEditingReleaseTimer = 0;
+  let pendingAdminPreviewRefresh = false;
+  let lastContractPreviewIdentity = "";
+  let adminEditingContractId = "";
+  let adminEditingFieldKey = "";
+  let adminEditingSessionUntil = 0;
+  let adminDatePickerFieldKey = "";
   const clauseEditorDraftByVersionId = new Map();
   let supabaseClient = createSupabaseBrowserClient();
   let adminSession = null;
@@ -332,11 +341,15 @@
     document.getElementById("submitSignBtn").addEventListener("click", submitSignature);
     document.getElementById("confirmCheckbox").addEventListener("change", confirmSigner);
     document.getElementById("signerUpload").addEventListener("change", handleSignerUploadChange);
-    document.getElementById("contractForm").addEventListener("input", handleFieldInput);
-    document.getElementById("contractForm").addEventListener("change", handleFieldChange);
-    document.getElementById("contractForm").addEventListener("click", handleFormClick);
-    document.getElementById("contractForm").addEventListener("keydown", handleFormKeydown);
-    document.getElementById("contractForm").addEventListener("submit", (event) => event.preventDefault());
+    const contractForm = document.getElementById("contractForm");
+    contractForm.addEventListener("input", handleFieldInput);
+    contractForm.addEventListener("change", handleFieldChange);
+    contractForm.addEventListener("click", handleFormClick);
+    contractForm.addEventListener("keydown", handleFormKeydown);
+    contractForm.addEventListener("submit", (event) => event.preventDefault());
+    contractForm.addEventListener("pointerdown", handleContractFormPointerDown, true);
+    contractForm.addEventListener("focusin", handleContractFormFocusIn);
+    contractForm.addEventListener("focusout", handleContractFormFocusOut);
     document.getElementById("contractList").addEventListener("click", selectContractFromList);
     document.getElementById("searchInput").addEventListener("input", renderContractList);
     document.getElementById("authForm").addEventListener("submit", handleAuthSubmit);
@@ -413,23 +426,9 @@
     document.getElementById("signedCount").textContent = String(monthContracts.filter((contract) => contract.status === "signed").length);
   }
 
-  function renderForm() {
+  function renderForm(options = {}) {
     const contract = currentContract();
-    if (!contract) {
-      document.getElementById("contractPreview").innerHTML = "";
-      return;
-    }
-    if (shouldDeferPartyASignaturePreview(contract)) return;
-    capturePartyASignatureDraftFromDom();
-    const isDraft = contract.status === "draft";
-    document.getElementById("contractPreview").innerHTML = isDraft
-      ? renderEditableContractDocument(contract)
-      : renderContractDocument(contract);
-    if (isDraft) {
-      setupPartyASignatureCanvas();
-    } else {
-      partyASignatureCanvasContractId = "";
-    }
+    renderContractPreviewContent(contract, options);
   }
 
   function renderField(contract, field, locked) {
@@ -550,6 +549,7 @@
   }
 
   function handleFormClick(event) {
+    beginAdminEditingSession(event.target, contractFormFreezeDuration(event.target) || 1800);
     const toggle = getClosest(event.target, "[data-option-toggle]");
     if (toggle) {
       toggleOptionPanel(toggle.dataset.optionToggle);
@@ -574,6 +574,7 @@
   }
 
   function handleFormKeydown(event) {
+    beginAdminEditingSession(event.target, event.target && event.target.type === "date" ? 12000 : 6000);
     const optionInput = getClosest(event.target, "[data-option-new]");
     if (!optionInput || event.key !== "Enter") return;
     event.preventDefault();
@@ -584,7 +585,7 @@
     const contract = currentContract();
     if (!contract || contract.status !== "draft") return;
     openOptionPanelKey = openOptionPanelKey === fieldKey ? "" : fieldKey;
-    renderForm();
+    renderForm({ force: true, ignoreDefer: true });
   }
 
   function addComboOption(fieldKey) {
@@ -599,12 +600,17 @@
     const contract = currentContract();
     if (!contract || contract.status !== "draft") return;
     store[field.optionStoreKey] = normalizeOptions(store[field.optionStoreKey], [], [nextValue]);
+    touchOptionStore(field.optionStoreKey);
     contract.fields[fieldKey] = nextValue;
     contract.updatedAt = nowIso();
     openOptionPanelKey = "";
     saveStore(true);
     showValidation([]);
-    renderAll();
+    clearAdminEditingSession({ force: true, clearPending: true });
+    renderContractList();
+    renderMonthlyStats();
+    renderPreview();
+    renderForm({ force: true, ignoreDefer: true });
   }
 
   function removeComboOption(fieldKey, value) {
@@ -614,8 +620,12 @@
     if (!targetValue) return;
     store[field.optionStoreKey] = normalizeOptions(store[field.optionStoreKey], [])
       .filter((option) => option.toLowerCase() !== targetValue.toLowerCase());
+    touchOptionStore(field.optionStoreKey);
     saveStore(true);
-    renderForm();
+    clearAdminEditingSession({ force: true, clearPending: true });
+    renderContractList();
+    renderForm({ force: true, ignoreDefer: true });
+    renderPreview();
   }
 
   function selectComboOption(fieldKey, value) {
@@ -626,13 +636,17 @@
     if (!nextValue) return;
     if (field.type === "combo" && field.optionStoreKey) {
       store[field.optionStoreKey] = normalizeOptions(store[field.optionStoreKey], [], [nextValue]);
+      touchOptionStore(field.optionStoreKey);
     }
     contract.fields[fieldKey] = nextValue;
     contract.updatedAt = nowIso();
     openOptionPanelKey = "";
     saveStore(true);
     showValidation([]);
-    renderAll();
+    clearAdminEditingSession({ force: true, clearPending: true });
+    renderContractList();
+    renderPreview();
+    renderForm({ force: true, ignoreDefer: true });
   }
 
   function renderPreview() {
@@ -640,20 +654,6 @@
     if (!contract) return;
     const status = STATUS[contract.status] || STATUS.draft;
     document.getElementById("previewMeta").textContent = `${status.label} · ${contract.fields.brand || "未命名合同"}`;
-    if (getClosest(document.activeElement, "#contractForm")) return;
-    const shouldDeferPreview = shouldDeferPartyASignaturePreview(contract);
-    capturePartyASignatureDraftFromDom();
-    const isDraft = contract.status === "draft";
-    if (!shouldDeferPreview) {
-      document.getElementById("contractPreview").innerHTML = isDraft
-        ? renderEditableContractDocument(contract)
-        : renderContractDocument(contract);
-      if (isDraft) {
-        setupPartyASignatureCanvas();
-      } else {
-        partyASignatureCanvasContractId = "";
-      }
-    }
     document.getElementById("publishBtn").disabled = contract.status !== "draft";
     document.getElementById("revokeBtn").disabled = !["published", "confirmed"].includes(contract.status);
     const shareBox = document.getElementById("shareBox");
@@ -664,6 +664,223 @@
     } else {
       shareBox.hidden = true;
     }
+  }
+
+  function renderContractPreviewContent(contract, options = {}) {
+    const preview = document.getElementById("contractPreview");
+    const force = Boolean(options && options.force);
+    const ignoreDefer = Boolean(options && options.ignoreDefer);
+    if (!contract) {
+      preview.innerHTML = "";
+      lastContractPreviewIdentity = "";
+      pendingAdminPreviewRefresh = false;
+      partyASignatureCanvasContractId = "";
+      clearAdminEditingSession({ force: true, clearPending: true });
+      return;
+    }
+    if (!ignoreDefer && shouldDeferPartyASignaturePreview(contract)) {
+      pendingAdminPreviewRefresh = true;
+      return;
+    }
+    capturePartyASignatureDraftFromDom();
+    const isDraft = contract.status === "draft";
+    if (!isDraft) {
+      clearAdminEditingSession({ force: true, clearPending: true });
+    }
+    const nextIdentity = buildContractPreviewIdentity(contract);
+    if (!force && !pendingAdminPreviewRefresh && nextIdentity === lastContractPreviewIdentity) return;
+    preview.innerHTML = isDraft
+      ? renderEditableContractDocument(contract)
+      : renderContractDocument(contract);
+    lastContractPreviewIdentity = nextIdentity;
+    pendingAdminPreviewRefresh = false;
+    if (isDraft) {
+      setupPartyASignatureCanvas();
+    } else {
+      partyASignatureCanvasContractId = "";
+    }
+  }
+
+  function buildContractPreviewIdentity(contract) {
+    if (!contract) return "";
+    const activeVersion = contract.status === "draft" ? activeClauseVersion() : null;
+    return JSON.stringify({
+      id: contract.id || "",
+      status: contract.status || "",
+      updatedAt: contract.updatedAt || "",
+      activeView,
+      optionPanel: openOptionPanelKey,
+      fields: contract.fields || {},
+      signatureDraft: getPartyASignatureDraft(contract),
+      clauseVersionId: activeVersion ? activeVersion.id : getIn(contract, ["snapshot", "clauseVersion"]) || "",
+      clauseVersionUpdatedAt: activeVersion ? activeVersion.updatedAt : "",
+      clauseVersionName: activeVersion ? activeVersion.version : "",
+    });
+  }
+
+  function isContractFormInteractionActive() {
+    const activeElement = document.activeElement;
+    if (!activeElement || !getClosest(activeElement, "#contractForm")) return false;
+    return activeElement.id === "partyASignatureCanvas"
+      || ["INPUT", "TEXTAREA", "SELECT"].includes(activeElement.tagName);
+  }
+
+  function lockAdminPreview(durationMs = 1200) {
+    adminPreviewFreezeUntil = Math.max(adminPreviewFreezeUntil, Date.now() + Math.max(0, durationMs));
+  }
+
+  function scheduleAdminPreviewRefresh(delayMs = 180) {
+    if (adminPreviewRefreshTimer) clearTimeout(adminPreviewRefreshTimer);
+    adminPreviewRefreshTimer = window.setTimeout(() => {
+      adminPreviewRefreshTimer = 0;
+      const contract = currentContract();
+      if (!contract) {
+        renderForm({ force: true });
+        return;
+      }
+      if (shouldDeferPartyASignaturePreview(contract)) {
+        pendingAdminPreviewRefresh = true;
+        return;
+      }
+      renderForm({ force: true });
+    }, Math.max(80, delayMs));
+  }
+
+  function contractFormFreezeDuration(target) {
+    if (!target || !getClosest(target, "#contractForm")) return 0;
+    if (target.id === "partyASignatureCanvas") return 2400;
+    if (target.type === "date") return 12000;
+    if (target.tagName === "TEXTAREA") return 5200;
+    if (target.tagName === "SELECT") return 4200;
+    if (target.tagName === "INPUT") return 4200;
+    return 3200;
+  }
+
+  function handleContractFormPointerDown(event) {
+    const duration = contractFormFreezeDuration(event.target);
+    if (!duration) return;
+    beginAdminEditingSession(event.target, duration);
+    lockAdminPreview(duration);
+  }
+
+  function handleContractFormFocusIn(event) {
+    const duration = contractFormFreezeDuration(event.target);
+    if (!duration) return;
+    beginAdminEditingSession(event.target, duration);
+    lockAdminPreview(duration);
+  }
+
+  function handleContractFormFocusOut(event) {
+    const nextTarget = event.relatedTarget;
+    if (nextTarget && getClosest(nextTarget, "#contractForm")) return;
+    pendingAdminPreviewRefresh = true;
+    const target = event.target;
+    const releaseDelay = contractFormFreezeDuration(target) || 1600;
+    if (target && target.type === "date" && adminDatePickerFieldKey) {
+      adminEditingSessionUntil = Math.max(adminEditingSessionUntil, Date.now() + releaseDelay);
+      lockAdminPreview(releaseDelay);
+    } else {
+      adminEditingSessionUntil = Math.max(adminEditingSessionUntil, Date.now() + 1200);
+    }
+    scheduleAdminEditingSessionRelease(releaseDelay + 180);
+  }
+
+  function resolveAdminEditingFieldKey(target) {
+    if (!target) return "";
+    const optionManager = getClosest(target, "[data-option-manager]");
+    return String(
+      target.dataset.fieldKey
+      || target.dataset.optionNew
+      || target.dataset.optionToggle
+      || target.dataset.optionAdd
+      || target.dataset.optionSelect
+      || target.dataset.optionDelete
+      || (optionManager && optionManager.dataset.optionManager)
+      || target.id
+      || target.name
+      || target.type
+      || "form"
+    ).trim();
+  }
+
+  function beginAdminEditingSession(target, durationMs = 1600) {
+    const contract = currentDraftContract();
+    if (!contract || !target || !getClosest(target, "#contractForm")) return;
+    adminEditingContractId = partyASignatureDraftKey(contract);
+    adminEditingFieldKey = resolveAdminEditingFieldKey(target);
+    const effectiveDuration = Math.max(contractFormFreezeDuration(target), durationMs, 1600);
+    adminEditingSessionUntil = Math.max(adminEditingSessionUntil, Date.now() + effectiveDuration);
+    if (target.type === "date") {
+      adminDatePickerFieldKey = adminEditingFieldKey;
+    }
+    if (adminEditingReleaseTimer) {
+      clearTimeout(adminEditingReleaseTimer);
+      adminEditingReleaseTimer = 0;
+    }
+  }
+
+  function clearAdminEditingSession(options = {}) {
+    if (!options.keepTimers && adminEditingReleaseTimer) {
+      clearTimeout(adminEditingReleaseTimer);
+      adminEditingReleaseTimer = 0;
+    }
+    adminEditingContractId = "";
+    adminEditingFieldKey = "";
+    adminEditingSessionUntil = 0;
+    if (!options.keepDatePickerField) adminDatePickerFieldKey = "";
+    if (options.clearPending) {
+      pendingAdminPreviewRefresh = false;
+    }
+  }
+
+  function scheduleAdminEditingSessionRelease(delayMs = 280) {
+    if (adminEditingReleaseTimer) clearTimeout(adminEditingReleaseTimer);
+    adminEditingReleaseTimer = window.setTimeout(() => {
+      adminEditingReleaseTimer = 0;
+      releaseAdminEditingSessionIfIdle();
+    }, Math.max(120, delayMs));
+  }
+
+  function releaseAdminEditingSessionIfIdle() {
+    const contract = currentDraftContract();
+    if (!contract) {
+      clearAdminEditingSession({ force: true });
+      return;
+    }
+    if (isContractFormInteractionActive()) return;
+    const now = Date.now();
+    if (now < adminEditingSessionUntil) {
+      scheduleAdminEditingSessionRelease(adminEditingSessionUntil - now + 120);
+      return;
+    }
+    const shouldRefresh = pendingAdminPreviewRefresh;
+    clearAdminEditingSession();
+    if (shouldRefresh) {
+      scheduleAdminPreviewRefresh(180);
+    }
+  }
+
+  function hasActiveAdminEditingSession(contract) {
+    const contractId = partyASignatureDraftKey(contract);
+    return Boolean(
+      contractId
+      && adminEditingContractId === contractId
+      && (Date.now() < adminEditingSessionUntil || isContractFormInteractionActive())
+    );
+  }
+
+  function hasActiveAdminDatePickerSession(contract) {
+    const contractId = partyASignatureDraftKey(contract);
+    return Boolean(
+      contractId
+      && adminEditingContractId === contractId
+      && adminDatePickerFieldKey
+      && (Date.now() < adminEditingSessionUntil || Date.now() < adminPreviewFreezeUntil)
+    );
+  }
+
+  function hasUnsavedPartyASignatureDraft(contract) {
+    return Boolean(getPartyASignatureDraft(contract));
   }
 
   function renderSigner() {
@@ -952,6 +1169,8 @@ function renderClauses() {
     if (event.target.type === "file") return;
     const contract = currentContract();
     if (!contract || contract.status !== "draft") return;
+    beginAdminEditingSession(event.target, event.target.type === "date" ? 12000 : 6000);
+    if (event.target.type === "date") lockAdminPreview(12000);
     if (event.target.dataset.retentionLongTerm === "true") {
       contract.fields[key] = event.target.checked ? "长期" : "";
       const retentionControl = getClosest(event.target, ".retention-control");
@@ -969,6 +1188,12 @@ function renderClauses() {
     saveStore(true);
     renderContractList();
     renderMonthlyStats();
+    if (event.target.type === "date" || event.target.dataset.retentionLongTerm === "true") {
+      pendingAdminPreviewRefresh = true;
+      adminDatePickerFieldKey = "";
+      adminEditingSessionUntil = Math.max(adminEditingSessionUntil, Date.now() + 900);
+      scheduleAdminEditingSessionRelease(900);
+    }
   }
 
   function handleFieldChange(event) {
@@ -998,7 +1223,7 @@ function renderClauses() {
         contract.updatedAt = nowIso();
         saveStore(true);
         showValidation([]);
-        renderForm();
+        renderForm({ force: true, ignoreDefer: true });
       })
       .catch(() => {
         showValidation(["甲方签名图片读取失败，请重新上传。"]);
@@ -1006,6 +1231,7 @@ function renderClauses() {
   }
 
   function createContract() {
+    clearAdminEditingSession({ force: true, clearPending: true });
     const contract = makeContract();
     store.contracts.unshift(contract);
     store.selectedId = contract.id;
@@ -1021,7 +1247,7 @@ function renderClauses() {
     contract.updatedAt = nowIso();
     saveStore(true, { reason: "save-draft" });
     showValidation([]);
-    renderForm();
+    renderForm({ force: true, ignoreDefer: true });
     renderPreview();
   }
 
@@ -1037,6 +1263,7 @@ function renderClauses() {
       showValidation(errors);
       return;
     }
+    clearAdminEditingSession({ force: true, clearPending: true });
     contract.status = "published";
     contract.publishedAt = nowIso();
     contract.updatedAt = contract.publishedAt;
@@ -1072,6 +1299,7 @@ function renderClauses() {
   function revokeContract() {
     const contract = currentContract();
     if (!contract || !["published", "confirmed"].includes(contract.status)) return;
+    clearAdminEditingSession({ force: true, clearPending: true });
     contract.status = "revoked";
     contract.updatedAt = nowIso();
     contract.audit.push(makeAudit("撤回合同", "乙方签署链接失效"));
@@ -1173,6 +1401,7 @@ function renderClauses() {
     }
     const item = getClosest(event.target, "[data-contract-id]");
     if (!item) return;
+    clearAdminEditingSession({ force: true, clearPending: true });
     store.selectedId = item.dataset.contractId;
     activeView = "editor";
     signerToken = "";
@@ -1193,6 +1422,7 @@ function renderClauses() {
     if (!contract) return;
     const ok = window.confirm(`确定删除合同「${contract.fields.brand || contract.fields.creatorName || "未命名合同"}」？`);
     if (!ok) return;
+    clearAdminEditingSession({ force: true, clearPending: true });
     store.deletedContracts = normalizeDeletedContracts([
       ...(Array.isArray(store.deletedContracts) ? store.deletedContracts : []),
       {
@@ -1536,6 +1766,8 @@ function renderClauses() {
       drawing = false;
       partyASignatureDrawingContractId = "";
       persistDraftSignature();
+      lockAdminPreview(1400);
+      scheduleAdminPreviewRefresh(260);
       if (!event) return;
       try {
         canvas.releasePointerCapture(event.pointerId);
@@ -1576,6 +1808,7 @@ function renderClauses() {
       if (!contract) return;
       drawing = true;
       partyASignatureDrawingContractId = partyASignatureDraftKey(contract);
+      lockAdminPreview(1800);
       try {
         canvas.setPointerCapture(event.pointerId);
       } catch (error) {
@@ -1618,7 +1851,8 @@ function renderClauses() {
       contract.fields.partyASignature = "";
       contract.updatedAt = nowIso();
       saveStore(true, { reason: "clear-party-a-signature", immediate: true });
-      renderForm();
+      clearAdminEditingSession({ force: true, clearPending: true });
+      renderForm({ force: true, ignoreDefer: true });
       renderPreview();
     });
 
@@ -1630,7 +1864,8 @@ function renderClauses() {
       clearPartyASignatureDraft(contract);
       contract.updatedAt = nowIso();
       saveStore(true, { reason: "save-party-a-signature", immediate: true });
-      renderForm();
+      clearAdminEditingSession({ force: true, clearPending: true });
+      renderForm({ force: true, ignoreDefer: true });
       renderPreview();
     });
 
@@ -1690,8 +1925,10 @@ function renderClauses() {
       selectedId: contract.id,
       contracts: [contract],
       deletedContracts: [],
-      brandOptions: normalizeOptions([], DEFAULT_BRAND_OPTIONS, [contract.fields.brand]),
-      platformOptions: normalizeOptions([], DEFAULT_PLATFORM_OPTIONS, [contract.fields.platform]),
+      brandOptions: normalizeOptions([], DEFAULT_BRAND_OPTIONS),
+      platformOptions: normalizeOptions([], DEFAULT_PLATFORM_OPTIONS),
+      brandOptionsUpdatedAt: nowIso(),
+      platformOptionsUpdatedAt: nowIso(),
       clauseVersions,
       activeClauseVersionId: clauseVersions[0].id,
       lastAppliedClauseSeed: CLAUSE_SEED_VERSION,
@@ -1706,13 +1943,21 @@ function renderClauses() {
       deletedContracts: normalizeDeletedContracts(parsed.deletedContracts),
       brandOptions: normalizeOptions(
         parsed.brandOptions,
-        Array.isArray(parsed.brandOptions) ? [] : DEFAULT_BRAND_OPTIONS,
-        Array.isArray(parsed.brandOptions) ? parsed.contracts.map((contract) => getIn(contract, ["fields", "brand"])) : parsed.contracts.map((contract) => getIn(contract, ["fields", "brand"])),
+        DEFAULT_BRAND_OPTIONS,
       ),
       platformOptions: normalizeOptions(
         parsed.platformOptions,
-        Array.isArray(parsed.platformOptions) ? [] : DEFAULT_PLATFORM_OPTIONS,
-        Array.isArray(parsed.platformOptions) ? parsed.contracts.map((contract) => getIn(contract, ["fields", "platform"])) : parsed.contracts.map((contract) => getIn(contract, ["fields", "platform"])),
+        DEFAULT_PLATFORM_OPTIONS,
+      ),
+      brandOptionsUpdatedAt: normalizeOptionSetUpdatedAt(
+        parsed.brandOptionsUpdatedAt,
+        parsed.updatedAt,
+        parsed.contracts,
+      ),
+      platformOptionsUpdatedAt: normalizeOptionSetUpdatedAt(
+        parsed.platformOptionsUpdatedAt,
+        parsed.updatedAt,
+        parsed.contracts,
       ),
       clauseVersions: normalizeClauseVersions(parsed.clauseVersions),
       activeClauseVersionId: parsed.activeClauseVersionId || "",
@@ -1832,6 +2077,45 @@ function renderClauses() {
         seen.add(key);
         return true;
       });
+  }
+
+  function normalizeOptionSetUpdatedAt(primaryValue, fallbackValue, contracts = []) {
+    const direct = latestTimestamp([primaryValue, fallbackValue]);
+    if (direct > 0) return new Date(direct).toISOString();
+    const contractTime = latestTimestamp((Array.isArray(contracts) ? contracts : []).map((contract) => contract && contract.updatedAt));
+    return contractTime > 0 ? new Date(contractTime).toISOString() : nowIso();
+  }
+
+  function optionStoreUpdatedAtKey(optionStoreKey) {
+    if (optionStoreKey === "brandOptions") return "brandOptionsUpdatedAt";
+    if (optionStoreKey === "platformOptions") return "platformOptionsUpdatedAt";
+    return "";
+  }
+
+  function touchOptionStore(optionStoreKey, at = nowIso()) {
+    const updatedAtKey = optionStoreUpdatedAtKey(optionStoreKey);
+    if (!updatedAtKey) return;
+    store[updatedAtKey] = at;
+  }
+
+  function mergeManagedOptions(remote, local, optionStoreKey, defaults = []) {
+    const updatedAtKey = optionStoreUpdatedAtKey(optionStoreKey);
+    const remoteTime = latestTimestamp([remote && remote[updatedAtKey], remote && remote.updatedAt]);
+    const localTime = latestTimestamp([local && local[updatedAtKey], local && local.updatedAt]);
+    const sourceValues = remoteTime > localTime
+      ? remote[optionStoreKey]
+      : localTime > remoteTime
+        ? local[optionStoreKey]
+        : Array.isArray(local[optionStoreKey]) && local[optionStoreKey].length
+          ? local[optionStoreKey]
+          : remote[optionStoreKey];
+    return {
+      values: normalizeOptions(sourceValues, defaults),
+      updatedAt: normalizeOptionSetUpdatedAt(
+        remoteTime > localTime ? remote && remote[updatedAtKey] : localTime > remoteTime ? local && local[updatedAtKey] : local && local[updatedAtKey] || remote && remote[updatedAtKey],
+        remoteTime > localTime ? remote && remote.updatedAt : localTime > remoteTime ? local && local.updatedAt : local && local.updatedAt || remote && remote.updatedAt,
+      ),
+    };
   }
 
   function normalizePlatformFields(fields, rawFields = {}) {
@@ -1960,8 +2244,14 @@ function renderClauses() {
     return Boolean(
       contract
       && contract.status === "draft"
-      && partyASignatureDrawingContractId
-      && partyASignatureDrawingContractId === partyASignatureDraftKey(contract),
+      && (
+        (partyASignatureDrawingContractId
+          && partyASignatureDrawingContractId === partyASignatureDraftKey(contract))
+        || hasUnsavedPartyASignatureDraft(contract)
+        || hasActiveAdminEditingSession(contract)
+        || hasActiveAdminDatePickerSession(contract)
+        || Date.now() < adminPreviewFreezeUntil
+      ),
     );
   }
 
@@ -2610,6 +2900,8 @@ function renderClauses() {
       })
       .sort((left, right) => contractTimestamp(right) - contractTimestamp(left));
     const clauseVersions = mergeClauseVersions(remote.clauseVersions, local.clauseVersions);
+    const mergedBrandOptions = mergeManagedOptions(remote, local, "brandOptions", DEFAULT_BRAND_OPTIONS);
+    const mergedPlatformOptions = mergeManagedOptions(remote, local, "platformOptions", DEFAULT_PLATFORM_OPTIONS);
     const merged = {
       selectedId: contracts.some((contract) => contract.id === local.selectedId)
         ? local.selectedId
@@ -2618,16 +2910,10 @@ function renderClauses() {
           : contracts[0] && contracts[0].id || "",
       contracts,
       deletedContracts,
-      brandOptions: normalizeOptions(
-        [...remote.brandOptions, ...local.brandOptions],
-        DEFAULT_BRAND_OPTIONS,
-        contracts.map((contract) => getIn(contract, ["fields", "brand"])),
-      ),
-      platformOptions: normalizeOptions(
-        [...remote.platformOptions, ...local.platformOptions],
-        DEFAULT_PLATFORM_OPTIONS,
-        contracts.map((contract) => getIn(contract, ["fields", "platform"])),
-      ),
+      brandOptions: mergedBrandOptions.values,
+      platformOptions: mergedPlatformOptions.values,
+      brandOptionsUpdatedAt: mergedBrandOptions.updatedAt,
+      platformOptionsUpdatedAt: mergedPlatformOptions.updatedAt,
       clauseVersions,
       activeClauseVersionId: resolveActiveClauseVersionId(
         clauseVersions,
