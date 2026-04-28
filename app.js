@@ -1,5 +1,5 @@
 (() => {
-  const BUILD_TAG = "20260428-clause-label-fix";
+  const BUILD_TAG = "20260428-promotion-fee-split";
   const STORE_KEY = "simple-contract-system-v1";
   const AUTH_KEY = "simple-contract-system-auth-v1";
   const CHANNEL_NAME = "simple-contract-system-sync-v1";
@@ -69,6 +69,8 @@
     partyAProvided: "ap",
     price: "pr",
     amountUpper: "au",
+    promotionServiceFee: "psf",
+    promotionServiceFeeUpper: "psu",
     partyASignDate: "ad",
     partyASignature: "as",
   };
@@ -140,6 +142,8 @@
       fields: [
         { key: "price", label: "价格", type: "number", required: true },
         { key: "amountUpper", label: "金额大写", readonly: true },
+        { key: "promotionServiceFee", label: "一次性推广服务费", type: "number", required: true },
+        { key: "promotionServiceFeeUpper", label: "推广服务费大写", readonly: true },
         { key: "maintenanceDays", label: "发布后维护天数", type: "number", required: true },
         { key: "prepaymentWorkdays", label: "预付款工作日数", type: "number", required: true },
         { key: "prepaymentPercent", label: "预付款比例", type: "number", required: true },
@@ -248,6 +252,8 @@
     partyAProvided: "品牌资料、拍摄要求、审核反馈、禁用词和发布注意事项。",
     price: "300",
     amountUpper: "人民币叁佰元整",
+    promotionServiceFee: "300",
+    promotionServiceFeeUpper: "人民币叁佰元整",
     maintenanceDays: "7天内",
     prepaymentWorkdays: "5个工作日内",
     prepaymentPercent: "50%",
@@ -269,6 +275,8 @@
     publishTime: "最终内容发布时间",
     rescheduleNoticeHours: "改期提前通知时限",
     sampleFeedbackNote: "样品反馈条文说明",
+    promotionServiceFee: "一次性推广服务费",
+    promotionServiceFeeUpper: "推广服务费大写",
     maintenanceDays: "发布后维护周期",
     prepaymentWorkdays: "预付款支付时限",
     prepaymentPercent: "预付款比例",
@@ -288,6 +296,8 @@
     publishTime: "将更新到：三、档期与流程 > 最终内容确认时间",
     rescheduleNoticeHours: "将更新到：三、档期与流程 > 调整限制",
     sampleFeedbackNote: "将更新到：三、档期与流程 > 样品反馈说明",
+    promotionServiceFee: "将更新到：四、推广费用与支付 > 一次性推广服务费",
+    promotionServiceFeeUpper: "将更新到：四、推广费用与支付 > 一次性推广服务费大写金额",
     maintenanceDays: "将更新到：四、推广费用与支付 > 发布后维护说明",
     prepaymentWorkdays: "将更新到：四、推广费用与支付 > 预付款条款",
     prepaymentPercent: "将更新到：四、推广费用与支付 > 预付款条款",
@@ -1552,6 +1562,7 @@ function renderClauses(options = {}) {
       finalRevisionWorkdays: ["finalRevisionWorkdays"],
       finalPublishDeadline: ["publishDate", "publishTime"],
       rescheduleNoticeHours: ["rescheduleNoticeHours"],
+      serviceFee: ["promotionServiceFee"],
       maintenanceDays: ["maintenanceDays"],
       prepaymentWorkdays: ["prepaymentWorkdays"],
       prepaymentPercent: ["prepaymentPercent"],
@@ -1601,6 +1612,7 @@ function renderClauses(options = {}) {
   }
 
   function clauseTemplateValue(token, fields = {}) {
+    const serviceFeeBase = promotionServiceFeeValue(fields);
     const values = {
       draftSubmitDeadline: formatClauseDeadline(fields.draftSubmitDeadlineDate, fields.draftSubmitDeadlineTime),
       reviewContact: formatWrappedText(fields.reviewContact),
@@ -1610,16 +1622,16 @@ function renderClauses(options = {}) {
       finalPublishDeadline: formatClauseDeadline(fields.publishDate, fields.publishTime),
       publishPlatform: fields.platform || DEFAULT_FIELDS.platform,
       rescheduleNoticeHours: formatHourText(fields.rescheduleNoticeHours),
-      serviceFee: formatMoney(fields.price),
-      serviceFeeUpper: fields.amountUpper || moneyToChinese(fields.price) || DEFAULT_FIELDS.amountUpper,
+      serviceFee: formatMoney(serviceFeeBase),
+      serviceFeeUpper: fields.promotionServiceFeeUpper || moneyToChinese(serviceFeeBase) || DEFAULT_FIELDS.promotionServiceFeeUpper,
       maintenanceDays: normalizeDurationText(fields.maintenanceDays, "天内"),
       prepaymentWorkdays: formatWorkdayText(fields.prepaymentWorkdays),
       prepaymentPercent: formatPercentText(fields.prepaymentPercent),
-      prepaymentAmount: formatMoney(calculatePercentAmount(fields.price, fields.prepaymentPercent)),
+      prepaymentAmount: formatMoney(calculatePercentAmount(serviceFeeBase, fields.prepaymentPercent)),
       finalPaymentAfterPublishDays: normalizeDurationText(fields.finalPaymentAfterPublishDays, "天内"),
       finalPaymentWorkdays: formatWorkdayText(fields.finalPaymentWorkdays),
       finalPaymentPercent: formatPercentText(fields.finalPaymentPercent),
-      finalPaymentAmount: formatMoney(calculatePercentAmount(fields.price, fields.finalPaymentPercent)),
+      finalPaymentAmount: formatMoney(calculatePercentAmount(serviceFeeBase, fields.finalPaymentPercent)),
       performanceMetric: fields.performanceMetric || DEFAULT_FIELDS.performanceMetric,
       deductionScenario: fields.deductionScenario || DEFAULT_FIELDS.deductionScenario,
     };
@@ -1667,6 +1679,11 @@ function renderClauses(options = {}) {
     const text = String(value || "").trim();
     if (!text) return "";
     return text.includes("%") ? text : `${text}%`;
+  }
+
+  function promotionServiceFeeValue(fields = {}) {
+    const value = String(fields.promotionServiceFee == null ? "" : fields.promotionServiceFee).trim();
+    return value || fields.price || DEFAULT_FIELDS.price;
   }
 
   function calculatePercentAmount(price, percent) {
@@ -1731,6 +1748,11 @@ function renderClauses(options = {}) {
       contract.fields.amountUpper = moneyToChinese(event.target.value);
       const amountUpperInput = document.querySelector('[data-field-key="amountUpper"]');
       if (amountUpperInput) amountUpperInput.value = contract.fields.amountUpper;
+    }
+    if (key === "promotionServiceFee") {
+      contract.fields.promotionServiceFeeUpper = moneyToChinese(event.target.value);
+      const promotionUpperInput = document.querySelector('[data-field-key="promotionServiceFeeUpper"]');
+      if (promotionUpperInput) promotionUpperInput.value = contract.fields.promotionServiceFeeUpper;
     }
     contract.updatedAt = nowIso();
     saveStore(true);
@@ -2167,6 +2189,7 @@ function renderClauses(options = {}) {
       });
     });
     if (Number(contract.fields.price) <= 0) errors.push("价格必须大于 0");
+    if (Number(promotionServiceFeeValue(contract.fields)) <= 0) errors.push("一次性推广服务费必须大于 0");
     return errors;
   }
 
@@ -2549,6 +2572,12 @@ function renderClauses(options = {}) {
     if (fields.sampleShippingInfo === "寄样") fields.sampleShippingInfo = "已寄样";
     if (fields.sampleShippingInfo === "不寄样" || fields.sampleShippingInfo === "待确认") fields.sampleShippingInfo = "未寄样";
     fields.amountUpper = moneyToChinese(fields.price) || fields.amountUpper || DEFAULT_FIELDS.amountUpper;
+    if (!Object.prototype.hasOwnProperty.call(rawFields, "promotionServiceFee")) {
+      fields.promotionServiceFee = fields.price || DEFAULT_FIELDS.price;
+    }
+    fields.promotionServiceFeeUpper = moneyToChinese(fields.promotionServiceFee)
+      || fields.promotionServiceFeeUpper
+      || DEFAULT_FIELDS.promotionServiceFeeUpper;
     const snapshot = normalizeSnapshot(contract.snapshot, fields, contract.status);
     const status = String(contract.status || "draft").trim().toLowerCase();
     return {
@@ -2611,6 +2640,13 @@ function renderClauses(options = {}) {
     };
     normalizePlatformFields(normalized.fields, rawSnapshotFields);
     normalized.fields.amountUpper = moneyToChinese(normalized.fields.price) || normalized.fields.amountUpper || fields.amountUpper;
+    if (!Object.prototype.hasOwnProperty.call(rawSnapshotFields, "promotionServiceFee")) {
+      normalized.fields.promotionServiceFee = normalized.fields.price || fields.price || DEFAULT_FIELDS.price;
+    }
+    normalized.fields.promotionServiceFeeUpper = moneyToChinese(normalized.fields.promotionServiceFee)
+      || normalized.fields.promotionServiceFeeUpper
+      || fields.promotionServiceFeeUpper
+      || DEFAULT_FIELDS.promotionServiceFeeUpper;
     if (contractStatus === "draft" && shouldUpgradeSnapshotClauses(normalized)) {
       normalized.clauses = clone(DEFAULT_CLAUSES);
       normalized.clauseVersion = CLAUSE_SEED_LABEL;
@@ -4069,7 +4105,7 @@ function renderClauses(options = {}) {
   function compactShareFields(fields) {
     const compact = {};
     Object.entries(SHARE_FIELD_KEY_MAP).forEach(([fieldKey, shortKey]) => {
-      if (fieldKey === "amountUpper") return;
+      if (fieldKey === "amountUpper" || fieldKey === "promotionServiceFeeUpper") return;
       const rawValue = fields ? fields[fieldKey] : null;
       if (rawValue == null) return;
       const value = String(rawValue).trim();
@@ -4090,6 +4126,10 @@ function renderClauses(options = {}) {
     const fields = { ...DEFAULT_FIELDS, ...rawFields };
     normalizePlatformFields(fields, rawFields);
     fields.amountUpper = moneyToChinese(fields.price);
+    if (!Object.prototype.hasOwnProperty.call(rawFields, "promotionServiceFee")) {
+      fields.promotionServiceFee = fields.price || DEFAULT_FIELDS.price;
+    }
+    fields.promotionServiceFeeUpper = moneyToChinese(fields.promotionServiceFee) || DEFAULT_FIELDS.promotionServiceFeeUpper;
     return fields;
   }
 
