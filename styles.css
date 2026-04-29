@@ -658,12 +658,17 @@ textarea:disabled {
 }
 
 .contract-item strong,
-.contract-item-main,
 .contract-item-main span {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.contract-item-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .delete-contract-button {
@@ -694,6 +699,17 @@ textarea:disabled {
   background: #e7edf5;
   color: #4b5868;
   font-size: 12px;
+}
+
+.contract-created-at {
+  align-self: flex-end;
+  margin-top: 8px;
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: unset;
 }
 
 .status-signed {

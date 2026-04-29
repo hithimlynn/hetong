@@ -585,6 +585,7 @@
     list.innerHTML = items
       .map((contract) => {
         const status = STATUS[contract.status] || STATUS.draft;
+        const createdLabel = formatContractCreatedLabel(contract);
         return `
           <div class="contract-item${contract.id === store.selectedId ? " is-active" : ""}">
             <button class="contract-select-button" type="button" data-contract-id="${escapeAttr(contract.id)}">
@@ -592,6 +593,7 @@
               <strong>${escapeHtml(contract.fields.brand || "未命名合同")}</strong>
               <span>${escapeHtml(contract.fields.creatorName || "-")} · ${escapeHtml(formatPlatformLine(contract.fields))}</span>
               <em class="status-pill ${status.className}">${status.label}</em>
+              <span class="contract-created-at">${escapeHtml(createdLabel)}</span>
               </span>
             </button>
             <button class="delete-contract-button" type="button" data-delete-contract-id="${escapeAttr(contract.id)}" title="删除合同">删除</button>
@@ -2974,12 +2976,21 @@ function renderClauses(options = {}) {
     fields.oneTimePaymentWorkdays = String(fields.oneTimePaymentWorkdays || DEFAULT_FIELDS.oneTimePaymentWorkdays).trim() || DEFAULT_FIELDS.oneTimePaymentWorkdays;
     const snapshot = normalizeSnapshot(contract.snapshot, fields, contract.status);
     const status = String(contract.status || "draft").trim().toLowerCase();
+    const createdAt = String(contract.createdAt || "").trim();
+    const createdAtPrecise = String(
+      contract.createdAtPrecise
+      || contract.createdAtAt
+      || (createdAt.includes("T") ? createdAt : "")
+      || ""
+    ).trim();
     return {
       ...contract,
       status: STATUS[status] ? status : "draft",
       token: contract.token || randomToken(18),
       signWriteToken: contract.signWriteToken || randomToken(24),
       audit: Array.isArray(contract.audit) ? contract.audit : [],
+      createdAt,
+      createdAtPrecise,
       fields,
       snapshot,
       signature: contract.signature || getIn(snapshot, ["signature"]) || null,
@@ -3406,6 +3417,7 @@ function renderClauses(options = {}) {
       signature: null,
       audit: [makeAudit("创建合同", "系统生成合同草稿")],
       createdAt: now.slice(0, 10),
+      createdAtPrecise: now,
       updatedAt: now,
     };
   }
@@ -4746,6 +4758,7 @@ function renderClauses(options = {}) {
       publishedAt: contract.publishedAt || "",
       updatedAt: contract.updatedAt || "",
       createdAt: contract.createdAt || "",
+      createdAtPrecise: contract.createdAtPrecise || "",
     };
   }
 
@@ -4896,6 +4909,16 @@ function renderClauses(options = {}) {
       minute: "2-digit",
       hour12: false,
     });
+  }
+
+  function formatContractCreatedLabel(contract) {
+    const precise = String(contract?.createdAtPrecise || "").trim();
+    if (precise) return `生成于 ${formatDateTime(precise)}`;
+    const createdAt = String(contract?.createdAt || "").trim();
+    if (!createdAt) return "生成时间未知";
+    if (createdAt.includes("T")) return `生成于 ${formatDateTime(createdAt)}`;
+    const dateText = formatDateCn(createdAt);
+    return `生成于 ${dateText || createdAt}`;
   }
 
   function formatRetentionDate(value) {
